@@ -1,0 +1,9 @@
+# BFCL v3 multi-turn component (Berkeley Function Calling Leaderboard).
+# Install into a DEDICATED venv (see SETUP.md §3) — bfcl_eval pins tree_sitter==0.21.3,
+# which conflicts with evalplus's tree-sitter>=0.22.0. Do NOT co-install with evalplus.
+#
+# Pinned to the release matching the researched integration seam (commit 6ea5797).
+# A custom OSSHandler subclass is registered per ticket #3; --skip-server-setup points
+# BFCL at mlx_lm serve. Requires Python >= 3.10; use 3.12 (tree_sitter 0.21.3 ships
+# cp312 wheels; it has NO cp314 wheels).
+bfcl_eval==2026.3.23

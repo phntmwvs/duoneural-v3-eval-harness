@@ -1,0 +1,6 @@
+# Core harness stack — shared across all components.
+# Install into the shared venv (see SETUP.md). Interpreter: Homebrew Python 3.12.
+#
+# mlx-lm: pip build with the `datasets` extra (the brew CLI-only formula lacks `datasets`,
+# which perplexity + some eval paths need).
+mlx-lm[datasets]==0.32.0

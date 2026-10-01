@@ -9,55 +9,70 @@ The Foundry agent builds this repo via PRs from the mini; **oxy runs the matrix 
 - **Apple silicon Mac with enough unified memory** for the BF16 row (~17 GB weights + runtime
   headroom). The M4 Pro (48 GB) is the target; a 16 GB machine cannot hold BF16.
 - **Homebrew** on PATH (`brew --version` should succeed).
-- **Python ≥ 3.10.** BFCL requires it. **Do NOT use Apple's system Python**
-  (`/usr/bin/python3` = 3.9.6 — too old, and `mlx-lm`/`evalplus` will fail against it).
+- **Python 3.12.** BFCL requires ≥ 3.10, but the eval stack's pinned deps (`tree-sitter`,
+  and others) ship **no cp314 wheels** — so the modern-but-mature **3.12** is the target.
+  **Do NOT use Apple's system Python** (`/usr/bin/python3` = 3.9.6 — too old), and do **not**
+  use 3.14 for this stack (missing prebuilt wheels → source builds that need a C toolchain).
 
-## 1. Interpreter: use Homebrew Python 3.14 by absolute path
+## 1. Interpreter: Homebrew Python 3.12 by absolute path
 
-The MBP has `python@3.14` (3.14.8) via brew. Bare `python3` resolves to Apple's 3.9 system
-Python — **never rely on `python3` by name.** Pin the interpreter by absolute path:
+Install 3.12 if needed, then pin it by absolute path (never bare `python3`, which resolves
+to Apple's 3.9):
 
 ```bash
-PY=/opt/homebrew/opt/python@3.14/bin/python3.14
-ls -l "$PY"            # must exist; if not: brew install python@3.14
-"$PY" --version        # Python 3.14.x
+brew install python@3.12
+PY=/opt/homebrew/opt/python@3.12/bin/python3.12
+ls -l "$PY"            # must exist
+"$PY" --version        # Python 3.12.x
 ```
 
-> **Why 3.14?** It's what's installed and modern. It's bleeding-edge — if a pinned dep below
-> fails to build a wheel on 3.14, fall back to a mature version:
-> `brew install python@3.12` and set `PY=/opt/homebrew/opt/python@3.12/bin/python3.12`,
-> then recreate the venv. Don't fight a broken 3.14 build; drop down.
+> **Why not 3.14 (which the MBP already has)?** `tree-sitter` 0.21.x / 0.22.x (required by
+> bfcl_eval and evalplus) publish wheels only up to **cp312**. On 3.14 pip falls back to a
+> source build that needs a working C toolchain and frequently fails. 3.12 has prebuilt
+> wheels for the entire pinned stack, so installs are fast and reliable.
 
-## 2. Clone + venv
+## 2. Three venvs — the components do NOT share an environment
+
+`bfcl_eval` pins `tree_sitter==0.21.3` and `evalplus` needs `tree-sitter>=0.22.0` —
+**they cannot coexist in one venv** (pip `ResolutionImpossible`). The harness is three
+independent components behind a common runner contract (wayfinder Q2), so each gets its own
+venv. The **core** venv (mlx-lm + `datasets`) is the shared generation/serving layer the
+components drive.
 
 ```bash
-git clone https://github.com/phntmwvs/duoneural-v3-eval-harness.git
 cd duoneural-v3-eval-harness
-PY=/opt/homebrew/opt/python@3.14/bin/python3.14
-"$PY" -m venv .venv
-source .venv/bin/activate
-python --version       # must read 3.14.x (NOT 3.9.x)
-which python           # must be .../duoneural-v3-eval-harness/.venv/bin/python
+PY=/opt/homebrew/opt/python@3.12/bin/python3.12
+
+# Core: mlx-lm serving + datasets (drives mlx_lm serve for all components)
+"$PY" -m venv .venv-core
+.venv-core/bin/python -m pip install --upgrade pip
+.venv-core/bin/python -m pip install -r requirements-core.txt
+
+# BFCL component
+"$PY" -m venv .venv-bfcl
+.venv-bfcl/bin/python -m pip install --upgrade pip
+.venv-bfcl/bin/python -m pip install -r requirements-bfcl.txt
+
+# EvalPlus component
+"$PY" -m venv .venv-evalplus
+.venv-evalplus/bin/python -m pip install --upgrade pip
+.venv-evalplus/bin/python -m pip install -r requirements-evalplus.txt
 ```
 
-The venv is **activated per-session** (`source .venv/bin/activate`), not added to PATH globally.
-Inside the activated venv, `python`/`pip` are the venv's and Apple's 3.9 is unreachable.
+`.venv-*/` are gitignored. Activate the one you're working in (`source .venv-core/bin/activate`),
+or call the venv pythons directly (the matrix runner does the latter — no activation needed).
 
-## 3. Install the pinned stack
+## 3. Verify the import anchors
 
 ```bash
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+.venv-core/bin/python     -c "import mlx_lm; print('mlx_lm', mlx_lm.__version__)"
+.venv-core/bin/python     -c "import datasets; print('datasets', datasets.__version__)"
+.venv-bfcl/bin/python     -c "import bfcl_eval; print('bfcl_eval ok')"
+.venv-evalplus/bin/python -c "import evalplus; print('evalplus ok')"
 ```
 
-Then verify the three import anchors:
-
-```bash
-python -c "import mlx_lm; print('mlx_lm', mlx_lm.__version__)"
-python -c "import datasets; print('datasets', datasets.__version__)"
-python -c "import evalplus; print('evalplus ok')"
-python -c "import bfcl_eval; print('bfcl_eval ok')"
-```
+All four should print cleanly. A `tree-sitter` resolution or build error means you're on the
+wrong interpreter (3.14 or system 3.9) — recheck §1.
 
 ## 4. Checkpoints
 
@@ -80,18 +95,21 @@ Matrix rows (wayfinder map, Q3): **BF16, 8-bit, 4-bit, and stock LiquidAI base.*
 - **BFCL v3 multi-turn** — thin `OSSHandler` subclass (modeled on `qwen_fc.py`), registered in
   `bfcl_eval/constants/model_config.py`; run `bfcl generate --model <name> --skip-server-setup`
   against `mlx_lm serve` via `REMOTE_OPENAI_BASE_URL` + `REMOTE_OPENAI_TOKENIZER_PATH`.
-  Pinned to `bfcl_eval==2026.3.23`. See ticket #3 (spike) before the full build.
+  Pinned to `bfcl_eval==2026.3.23`. Runs in `.venv-bfcl`. See ticket #3 (spike) before the full build.
 - **EvalPlus HumanEval+MBPP** — pass@1, temperature 0, against `mlx_lm serve`
-  (`--backend openai --base-url`). Sandbox via the official `ganler/evalplus` Docker image
-  **if Docker is present** (`docker info` responds), else a local venv with resource limits.
+  (`--backend openai --base-url`). Runs in `.venv-evalplus`. Sandbox generated-code execution via
+  the official `ganler/evalplus` Docker image **if Docker is present** (`docker info` responds),
+  else a local run with resource limits.
 - **Custom Hermes FC suite** — ~40 hand-authored cases, strict JSON-schema + exact
-  function-name match, `<thought>` stripped before scoring. See ticket #4.
+  function-name match, `<thought>` stripped before scoring. Runs in `.venv-core` (no extra deps).
+  See ticket #4.
 
 ## 6. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| `python3 --version` → 3.9.6 | You're hitting Apple's system Python. Use the absolute brew path (§1). |
+| `python3 --version` → 3.9.6 | You're hitting Apple's system Python. Use the absolute brew 3.12 path (§1). |
+| `ResolutionImpossible: tree-sitter` / `tree_sitter` | You put bfcl_eval + evalplus in one venv. Use the three-venv layout (§2). |
+| `tree-sitter` has no wheel / tries to build from source | You're on Python 3.14. Switch to 3.12 (§1). |
 | `command not found: brew` | `eval "$(/opt/homebrew/bin/brew shellenv)"` (add to `~/.zprofile`). |
-| `pip install` build error on 3.14 | Fall back to `python@3.12` (§1 note); recreate the venv. |
-| `import bfcl_eval` fails | The pinned fork isn't installed; re-run §3 and check `requirements.txt`. |
+| `import bfcl_eval` fails | You're not in `.venv-bfcl`. Use the venv's python directly (§3). |
