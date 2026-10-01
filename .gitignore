@@ -1,0 +1,13 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Checkpoints + results (large / machine-local / never committed)
+checkpoints/
+evals/results/
+
+# OS
+.DS_Store
