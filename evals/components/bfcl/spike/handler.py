@@ -52,6 +52,45 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
             model_name, temperature, registry_name, is_fc_model, dtype=dtype, **kwargs
         )
 
+    # NOTE: OSSHandler marks spin_up_local_server @final, and its metaclass
+    # (EnforceOverrides) forbids subclassing it at all — so we cannot correct the
+    # `model` field there. Instead we fix it in _query_prompting (not final),
+    # lazily, the first time a query is sent (server is guaranteed up by then).
+    _resolved_server_model = None
+
+    def _server_model_id(self) -> str:
+        """The model id the remote server actually has loaded.
+
+        Root cause of the live 404 (ticket #3): OSSHandler._query_prompting sends
+        ``client.completions.create(model=self.model_path_or_id)``. For a remote
+        endpoint ``model_path_or_id`` falls back to ``model_name_huggingface``
+        (the registry key, ``duoneural-v3-mlx-fc``). mlx_lm's server treats any
+        ``model`` value that is NOT the served id as a model to load — and the
+        registry key isn't a local path, so it tries to pull it from HF and the
+        completion 404s with "Repository Not Found .../models/duoneural-v3-mlx-fc".
+
+        Fix: read the served id from ``GET {base_url}/models`` once and send that.
+        """
+        if self._resolved_server_model is None:
+            try:
+                import requests
+
+                resp = requests.get(f"{self.base_url}/models", timeout=10)
+                self._resolved_server_model = resp.json()["data"][0]["id"]
+                print(f"[spike] served model id from /v1/models: "
+                      f"{self._resolved_server_model!r}")
+            except Exception as e:  # pragma: no cover - spike diagnostics
+                print(f"[spike] WARNING: /v1/models lookup failed ({e}); "
+                      f"falling back to model_path_or_id={self.model_path_or_id!r}")
+                self._resolved_server_model = self.model_path_or_id
+        return self._resolved_server_model
+
+    @override
+    def _query_prompting(self, inference_data: dict):
+        # Ensure the completion names the served model, then run the stock path.
+        self.model_path_or_id = self._server_model_id()
+        return super()._query_prompting(inference_data)
+
     @override
     def decode_ast(self, result, language, has_tool_call_tag):
         result = _strip_thought(result)
