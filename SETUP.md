@@ -113,3 +113,4 @@ Matrix rows (wayfinder map, Q3): **BF16, 8-bit, 4-bit, and stock LiquidAI base.*
 | `tree-sitter` has no wheel / tries to build from source | You're on Python 3.14. Switch to 3.12 (§1). |
 | `command not found: brew` | `eval "$(/opt/homebrew/bin/brew shellenv)"` (add to `~/.zprofile`). |
 | `import bfcl_eval` fails | You're not in `.venv-bfcl`. Use the venv's python directly (§3). |
+| `No module named 'datasets'` | mlx-lm has no `datasets` extra (it's under `train`). Re-run §2 core install — `requirements-core.txt` pins `datasets` explicitly. |

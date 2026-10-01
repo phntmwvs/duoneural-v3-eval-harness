@@ -1,6 +1,9 @@
 # Core harness stack — shared across all components.
-# Install into the shared venv (see SETUP.md). Interpreter: Homebrew Python 3.12.
+# Install into the core venv (see SETUP.md §2). Interpreter: Homebrew Python 3.12.
 #
-# mlx-lm: pip build with the `datasets` extra (the brew CLI-only formula lacks `datasets`,
-# which perplexity + some eval paths need).
-mlx-lm[datasets]==0.32.0
+# mlx-lm: pip build. NB there is NO `datasets` extra in mlx-lm 0.32.0 — `datasets` ships
+# under the `train` extra (and `lm-eval` under `evaluate`). We pin `datasets` explicitly
+# (an extra name that doesn't exist is silently ignored by pip), and pull `evaluate` for
+# lm-eval (perplexity / standard eval tasks).
+mlx-lm[train,evaluate]==0.32.0
+datasets>=2.16
