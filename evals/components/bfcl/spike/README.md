@@ -27,7 +27,12 @@ spike — it de-risks the BFCL integration before the full handler build (ticket
 ## Prerequisites (MBP, per SETUP.md)
 
 1. `.venv-bfcl` and `.venv-core` built (`requirements-bfcl.txt` /
-   `requirements-core.txt`).
+   `requirements-core.txt`). `requirements-bfcl.txt` now also pins `soundfile`
+   — an **undeclared transitive dep** of `bfcl_eval` (via `qwen-agent`) without
+   which `import bfcl_eval.constants.model_config` dies with
+   `ModuleNotFoundError: No module named 'soundfile'`. Re-run
+   `.venv-bfcl/bin/pip install -r requirements-bfcl.txt` if your venv predates
+   the pin.
 2. A checkpoint pulled (smallest row is fine — this tests plumbing):
    ```bash
    huggingface-cli download phntmwvs/DuoNeural-v3-4bit-MLX \
@@ -39,8 +44,10 @@ spike — it de-risks the BFCL integration before the full handler build (ticket
 Two shells on the MBP (or run the server in the background):
 
 ```bash
-# 1. serve the checkpoint (core venv provides mlx_lm)
-.venv-core/bin/mlx_lm serve --model checkpoints/DuoNeural-v3-4bit --port 8080 &
+# 1. serve the checkpoint (core venv provides mlx_lm).
+#    NOTE: the pip mlx-lm subcommand is `server`, not `serve`
+#    (the brew formula's binary aliases `serve`; the venv console-script does not).
+.venv-core/bin/mlx_lm server --model checkpoints/DuoNeural-v3-4bit --port 8080 &
 
 # 2. wait for it to come up, then run the spike
 .venv-bfcl/bin/python -m evals.components.bfcl.spike.run_spike \
