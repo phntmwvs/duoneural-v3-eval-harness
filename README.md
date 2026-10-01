@@ -19,11 +19,11 @@ reports an **A/B delta vs the BF16 baseline** plus a **base-vs-published cross-c
 
 ## Topology
 
-The Foundry agent builds this repo via PRs from an M1 mini; **oxy runs the eval matrix on the
+The harness is developed via PRs from a separate build agent; **the user runs the eval matrix on the
 M4 Pro MacBook Pro** (48 GB) which holds the artifacts and the HF token. See `SETUP.md`.
 
 ## Process
 
 - **Wayfinder map:** issue #1 (destination + decisions index).
-- **Never commit to `main`** — branch + PR, oxy merges.
+- **Never commit to `main`** — branch + PR, reviewed and merged by a maintainer.
 - Prior effort (conversion + quantization): `phntmwvs/duoneural-v3-mlx`.

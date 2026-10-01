@@ -1,0 +1,6 @@
+# EvalPlus component (HumanEval + MBPP, base and '+') at pass@1 / temp 0.
+# Install into a DEDICATED venv (see SETUP.md §3) — evalplus needs tree-sitter>=0.22.0,
+# which conflicts with bfcl_eval's tree_sitter==0.21.3. Do NOT co-install with bfcl_eval.
+#
+# Use Python 3.12 (tree-sitter 0.22.x ships cp312 wheels; it has NO cp314 wheels).
+evalplus==0.3.1
