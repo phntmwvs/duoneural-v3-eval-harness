@@ -1,7 +1,7 @@
 # SETUP — DuoNeural v3 MLX eval harness
 
 Environment setup for running the eval matrix on the **M4 Pro MacBook Pro**.
-The Foundry agent builds this repo via PRs from the mini; **oxy runs the matrix on the MBP**
+The harness is developed via PRs from a separate build agent; **the user runs the matrix on the MBP**
 (see the wayfinder map, issue #1). All commands below run **on the MBP**.
 
 ## 0. Prerequisites
