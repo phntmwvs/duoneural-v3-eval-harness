@@ -100,6 +100,10 @@ Matrix rows (wayfinder map, Q3): **BF16, 8-bit, 4-bit, and stock LiquidAI base.*
   (`--backend openai --base-url`). Runs in `.venv-evalplus`. Sandbox generated-code execution via
   the official `ganler/evalplus` Docker image **if Docker is present** (`docker info` responds),
   else a local run with resource limits.
+  **macOS/Docker Desktop gotcha:** if `docker info` gives `permission denied` on
+  `/var/run/docker.sock`, the Desktop app isn't running or the client is on the wrong context —
+  `open -a Docker`, wait ~30s, then `docker context use desktop-linux` if needed. EvalPlus's
+  generated-code tests are tiny; Docker Desktop's default VM memory is ample.
 - **Custom Hermes FC suite** — ~40 hand-authored cases, strict JSON-schema + exact
   function-name match, `<thought>` stripped before scoring. Runs in `.venv-core` (no extra deps).
   See ticket #4.
