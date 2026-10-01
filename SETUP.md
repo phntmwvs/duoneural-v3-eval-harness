@@ -118,3 +118,5 @@ Matrix rows (wayfinder map, Q3): **BF16, 8-bit, 4-bit, and stock LiquidAI base.*
 | `command not found: brew` | `eval "$(/opt/homebrew/bin/brew shellenv)"` (add to `~/.zprofile`). |
 | `import bfcl_eval` fails | You're not in `.venv-bfcl`. Use the venv's python directly (§3). |
 | `No module named 'datasets'` | mlx-lm has no `datasets` extra (it's under `train`). Re-run §2 core install — `requirements-core.txt` pins `datasets` explicitly. |
+| `ModuleNotFoundError: No module named 'soundfile'` (importing `bfcl_eval.constants...`) | Undeclared transitive dep: `bfcl_eval` → `qwen-agent` imports `soundfile` but doesn't declare it. `requirements-bfcl.txt` pins it — re-run `.venv-bfcl/bin/pip install -r requirements-bfcl.txt`. |
+| `mlx_lm serve ...` → `ValueError: CLI requires a subcommand` | The pip mlx-lm subcommand is `server`, not `serve`: `.venv-core/bin/mlx_lm server --model <ckpt> --port 8080`. (The brew formula's binary aliases `serve`; the venv console-script does not.) |
