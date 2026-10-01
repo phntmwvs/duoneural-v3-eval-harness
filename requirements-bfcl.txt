@@ -7,3 +7,9 @@
 # BFCL at mlx_lm serve. Requires Python >= 3.10; use 3.12 (tree_sitter 0.21.3 ships
 # cp312 wheels; it has NO cp314 wheels).
 bfcl_eval==2026.3.23
+
+# Undeclared transitive dep: bfcl_eval -> qwen-agent (0.0.34) imports `soundfile`
+# in qwen_agent/utils/utils.py but does NOT declare it. Any clean venv fails with
+# `ModuleNotFoundError: No module named 'soundfile'` on
+# `import bfcl_eval.constants.model_config`. Pin it explicitly (ticket #3 debug).
+soundfile
