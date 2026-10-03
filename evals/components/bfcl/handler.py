@@ -66,21 +66,30 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
         ``client.completions.create(model=self.model_path_or_id)``. For a remote
         endpoint ``model_path_or_id`` falls back to the registry key
         (``duoneural-v3-mlx-fc``), which mlx_lm treats as an HF id to pull — and
-        it 404s. Read the served id from ``GET {base_url}/models`` once and send
-        that.
+        it 404s. Read the served id from ``GET {base_url}/models`` and send
+        that. Retry briefly: a freshly-spawned server can drop the first
+        connection while it warms up (observed live — a one-shot lookup that
+        failed here sank the run with the 404 above).
         """
         if self._resolved_server_model is None:
-            try:
-                import requests
+            import time
 
-                resp = requests.get(f"{self.base_url}/models", timeout=10)
-                self._resolved_server_model = resp.json()["data"][0]["id"]
-            except Exception as e:  # pragma: no cover - diagnostics
-                print(
-                    "[bfcl] WARNING: /v1/models lookup failed ({0}); falling back "
-                    "to model_path_or_id={1!r}".format(e, self.model_path_or_id)
+            import requests
+            last_err = None
+            for _attempt in range(10):
+                try:
+                    resp = requests.get(f"{self.base_url}/models", timeout=10)
+                    self._resolved_server_model = resp.json()["data"][0]["id"]
+                    break
+                except Exception as e:  # connection reset / not-ready / parse
+                    last_err = e
+                    time.sleep(1.0)
+            if self._resolved_server_model is None:
+                raise RuntimeError(
+                    "[bfcl] could not resolve the served model id from "
+                    f"{self.base_url}/models after retries ({last_err}); refusing "
+                    "to send the registry key, which mlx_lm would 404 as an HF id."
                 )
-                self._resolved_server_model = self.model_path_or_id
         return self._resolved_server_model
 
     @override
