@@ -43,6 +43,19 @@ COMPONENT_VENV = {
     "hermes": ".venv-core",
 }
 
+# Component -> the ``-m`` module its adapter entry point is dispatched to.
+# BFCL's real adapter (#17) is live; evalplus (#18) and hermes (#19) still run
+# the scaffold stub (``evals.components``) until they land.
+COMPONENT_ENTRY = {
+    "bfcl": "evals.components.bfcl",
+    "evalplus": "evals.components",
+    "hermes": "evals.components",
+}
+
+# Entry points that take a leading --component selector (the scaffold stub
+# dispatches on it; the real per-component adapters do not).
+_NEEDS_COMPONENT_FLAG = {"evals.components"}
+
 
 def venv_python(component: str, repo_root: str = REPO_ROOT) -> str:
     """Absolute path to the component's venv python."""
@@ -59,17 +72,20 @@ def build_component_command(
 ) -> list[str]:
     """Argv that runs the component's adapter in its own venv.
 
-    Real adapters (#17/#18/#19) expose ``python -m evals.components`` (their
-    own ``__main__``) and parse the same flags. ``model`` is the checkpoint ref
-    (local dir or HF id); ``model_name`` is the distinct matrix row name that
-    the result ``model`` field / filename uses.
+    Real adapters (#17/#18/#19) expose their own ``python -m
+    evals.components.<component>`` ``__main__`` and parse ``--model`` /
+    ``--model-name`` / ``--resume``. Components without a real adapter yet
+    dispatch to the scaffold stub (``evals.components``) which takes a leading
+    ``--component`` selector. ``model`` is the checkpoint ref (local dir or HF
+    id); ``model_name`` is the distinct matrix row name that the result
+    ``model`` field / filename uses.
     """
+    entry = COMPONENT_ENTRY[component]
     argv = [venv_python(component, repo_root)]
-    # Scaffold stub entry point. A real adapter (#17/#18/#19) replaces this
-    # with its own ``python -m evals.components.<component>`` __main__ in its
-    # venv; run_eval's dispatch target is the package stub until then.
-    argv += ["-m", "evals.components"]
-    argv += ["--component", component, "--model", model, "--model-name", model_name]
+    argv += ["-m", entry]
+    if entry in _NEEDS_COMPONENT_FLAG:
+        argv += ["--component", component]
+    argv += ["--model", model, "--model-name", model_name]
     if resume:
         argv.append("--resume")
     return argv

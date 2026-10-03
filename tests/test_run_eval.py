@@ -128,16 +128,25 @@ class ResultPathTest(unittest.TestCase):
 
 class BuildCommandTest(unittest.TestCase):
     def test_real_adapter_dispatch(self):
+        # BFCL (#17) dispatches to its real adapter entry point.
         argv = run_eval.build_component_command(
             "bfcl", "checkpoints/DuoNeural-v3-BF16", model_name="bf16"
         )
-        self.assertEqual(argv[1:3], ["-m", "evals.components"])
-        self.assertIn("--component", argv)
-        self.assertIn("bfcl", argv)
+        self.assertEqual(argv[1:3], ["-m", "evals.components.bfcl"])
+        self.assertNotIn("--component", argv)  # real adapter, no selector flag
         self.assertIn("--model", argv)
         self.assertIn("checkpoints/DuoNeural-v3-BF16", argv)
         self.assertIn("--model-name", argv)
         self.assertIn("bf16", argv)
+
+    def test_stub_components_still_use_selector(self):
+        # evalplus (#18) / hermes (#19) still run the scaffold stub, which
+        # takes a leading --component selector.
+        for component in ("evalplus", "hermes"):
+            argv = run_eval.build_component_command(component, "m", model_name="m")
+            self.assertEqual(argv[1:3], ["-m", "evals.components"])
+            self.assertIn("--component", argv)
+            self.assertIn(component, argv)
 
     def test_resume_flag_forwarded(self):
         argv = run_eval.build_component_command("bfcl", "m", model_name="m", resume=True)
@@ -181,49 +190,35 @@ class StubDispatchTest(unittest.TestCase):
         os.remove(path)  # keep the tree clean
 
     def test_full_dispatch_through_fake_venv(self):
+        # The scaffold's stub-dispatch prove-out is superseded for bfcl: #17
+        # wires it to its real adapter, which imports bfcl_eval and cannot run
+        # in a bare symlinked venv. What we still verify offline is that the
+        # per-venv dispatch resolves the correct interpreter and entry point.
         with tempfile.TemporaryDirectory() as tmp:
-            # copy the harness into a scratch root with a fake venv
-            for item in ("evals", "run_eval.py"):
-                src = os.path.join(_REPO_ROOT, item)
-                dst = os.path.join(tmp, item)
-                if os.path.isdir(src):
-                    shutil.copytree(src, dst, ignore=shutil.ignore_patterns("results", "__pycache__"))
-                else:
-                    shutil.copy2(src, dst)
             self._make_fake_venv(tmp, ".venv-bfcl")
-            code = run_eval.run_component("bfcl", "4bit", repo_root=tmp)
-            self.assertEqual(code, 0)
-            path = os.path.join(tmp, "evals", "results", "bfcl-4bit.json")
-            self.assertTrue(os.path.exists(path))
-            with open(path, encoding="utf-8") as fh:
-                loaded = json.load(fh)
-            self.assertEqual(results_mod.validate_result(loaded), [])
-            self.assertEqual(loaded["component"], "bfcl")
+            argv = run_eval.build_component_command(
+                "bfcl", "4bit", model_name="4bit", repo_root=tmp
+            )
+            # Resolves the fake venv's python and the real BFCL entry point.
+            self.assertTrue(argv[0].endswith(".venv-bfcl/bin/python"))
+            self.assertEqual(argv[1:3], ["-m", "evals.components.bfcl"])
+            self.assertIn("4bit", argv)
 
     def test_hf_id_checkpoint_with_distinct_row_name(self):
         # regression (PR #21 review): --model LiquidAI/LFM2.5-8B-A1B must not
-        # crash; model (row name) and checkpoint (ref) stay distinct.
+        # crash dispatch; model (row name) and checkpoint (ref) stay distinct.
+        # (bfcl is now a real adapter, so assert the argv rather than running
+        # it in a fake venv that lacks bfcl_eval.)
         with tempfile.TemporaryDirectory() as tmp:
-            for item in ("evals", "run_eval.py"):
-                src = os.path.join(_REPO_ROOT, item)
-                dst = os.path.join(tmp, item)
-                if os.path.isdir(src):
-                    shutil.copytree(src, dst, ignore=shutil.ignore_patterns("results", "__pycache__"))
-                else:
-                    shutil.copy2(src, dst)
             self._make_fake_venv(tmp, ".venv-bfcl")
-            code = run_eval.run_component(
+            argv = run_eval.build_component_command(
                 "bfcl", "LiquidAI/LFM2.5-8B-A1B", model_name="base", repo_root=tmp
             )
-            self.assertEqual(code, 0)
-            results_dir = os.path.join(tmp, "evals", "results")
-            files = os.listdir(results_dir)
-            self.assertEqual(files, ["bfcl-base.json"])  # slug-safe, in results dir
-            with open(os.path.join(results_dir, "bfcl-base.json"), encoding="utf-8") as fh:
-                loaded = json.load(fh)
-            self.assertEqual(results_mod.validate_result(loaded), [])
-            self.assertEqual(loaded["model"], "base")
-            self.assertEqual(loaded["checkpoint"], "LiquidAI/LFM2.5-8B-A1B")
+            self.assertEqual(argv[1:3], ["-m", "evals.components.bfcl"])
+            i = argv.index("--model")
+            self.assertEqual(argv[i + 1], "LiquidAI/LFM2.5-8B-A1B")
+            j = argv.index("--model-name")
+            self.assertEqual(argv[j + 1], "base")
 
     def test_emit_stub_keeps_model_and_checkpoint_distinct(self):
         with tempfile.TemporaryDirectory() as tmp:
