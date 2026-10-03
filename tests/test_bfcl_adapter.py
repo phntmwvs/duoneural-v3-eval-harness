@@ -371,6 +371,105 @@ class RunBfclCliTest(unittest.TestCase):
                         runner.run_bfcl_cli(["evaluate"], project_root="/tmp/x"), 0)
 
 
+class DedupeResultFileTest(unittest.TestCase):
+    """Defect B: BFCL's threaded result writer can append a duplicate record
+    for an id within one clean run (observed live: 336 records / 200 unique
+    ids). Dedup must keep the FIRST complete record per id and drop the
+    extra lines, so downstream evaluate sees one record per prompt."""
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = os.path.join(self.tmp.name, "result.json")
+
+    def _read_ids(self):
+        ids = []
+        with open(self.path) as fh:
+            for line in fh:
+                line = line.strip()
+                if line:
+                    ids.append(json.loads(line)["id"])
+        return ids
+
+    def test_first_record_wins(self):
+        # Two records for id "a": first is the complete one (2 turns),
+        # second is a truncated duplicate (1 turn). Keep the first.
+        rec_a1 = {"id": "a", "result": [[{"name": "f"}], [{"name": "g"}]]}
+        rec_a2 = {"id": "a", "result": [[{"name": "f"}]]}
+        rec_b = {"id": "b", "result": [[{"name": "h"}]]}
+        _write_jsonl(self.path, [rec_a1, rec_b, rec_a2])
+        normalize.dedupe_result_file(self.path)
+        self.assertEqual(self._read_ids(), ["a", "b"])
+        # The surviving "a" record is the first (complete) one.
+        with open(self.path) as fh:
+            first = json.loads(fh.readline())
+        self.assertEqual(len(first["result"]), 2)
+
+    def test_no_duplicates_is_idempotent(self):
+        rec_a = {"id": "a", "result": [[{"name": "f"}]]}
+        rec_b = {"id": "b", "result": [[{"name": "g"}]]}
+        _write_jsonl(self.path, [rec_a, rec_b])
+        normalize.dedupe_result_file(self.path)
+        self.assertEqual(self._read_ids(), ["a", "b"])
+
+    def test_missing_file_is_noop(self):
+        # A category that produced no result file must not crash the dedup,
+        # and must not create a file as a side effect.
+        missing = os.path.join(self.tmp.name, "nope.json")
+        normalize.dedupe_result_file(missing)
+        self.assertFalse(os.path.exists(missing))
+
+
+class RunnerDedupeWiringTest(unittest.TestCase):
+    """Defect B wiring: run() must dedup each category's result file after
+    generate and before evaluate, so the threaded-writer duplicates never
+    reach BFCL's completeness assertion."""
+
+    def test_dedup_runs_between_generate_and_evaluate(self):
+        import types
+        from unittest import mock
+
+        def fake_cli(argv, *, project_root):
+            op = argv[0]
+            if op == "evaluate":
+                # At evaluate time the result file must already be deduped.
+                result_dir = argv[argv.index("--result-dir") + 1]
+                score_dir = argv[argv.index("--score-dir") + 1]
+                path = normalize.find_result_file(
+                    result_dir, "duoneural-v3-mlx-fc", "multi_turn_base")
+                with open(path) as fh:
+                    ids = [json.loads(l)["id"] for l in fh if l.strip()]
+                # First-wins: no duplicates survive to evaluate.
+                self.assertEqual(sorted(ids), ["a", "b"])
+                for cat in normalize.MULTI_TURN_CATEGORIES:
+                    p = os.path.join(score_dir, "duoneural-v3-mlx-fc",
+                                     "multi_turn", normalize.score_filename(cat))
+                    _write_jsonl(p, _score_records(0.5, 1, 2))
+
+        fake_register = types.ModuleType("evals.components.bfcl.register")
+        fake_register.register = lambda *a, **k: "duoneural-v3-mlx-fc"
+
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            result_root = os.path.join(tmp, "result")
+            # Pre-seed a duplicated result file (as the threaded writer leaves).
+            dup = os.path.join(result_root, "duoneural-v3-mlx-fc",
+                               "multi_turn",
+                               normalize.result_filename("multi_turn_base"))
+            _write_jsonl(dup, [
+                {"id": "a", "result": [[{"name": "f"}], [{"name": "g"}]]},
+                {"id": "b", "result": [[{"name": "h"}]]},
+                {"id": "a", "result": [[{"name": "f"}]]},  # truncated dup
+            ])
+            with mock.patch.dict(sys.modules,
+                                 {"evals.components.bfcl.register": fake_register}), \
+                 mock.patch.object(runner, "run_bfcl_cli", side_effect=fake_cli):
+                runner.run("ckpt", base_url="http://127.0.0.1:9/v1",
+                           model_name="row", run_root=tmp,
+                           results_dir=os.path.join(tmp, "res"), resume=True)
+
+
 @unittest.skipUnless(
     os.environ.get("RUN_BFCL_LIVE") == "1",
     "live .venv-bfcl smoke test — set RUN_BFCL_LIVE=1 (needs bfcl_eval installed)",
@@ -395,6 +494,35 @@ class LiveBfclCliSmokeTest(unittest.TestCase):
             rc = runner.run_bfcl_cli(["test-categories"], project_root=d)
             self.assertEqual(rc, 0)
             self.assertEqual(os.environ.get("BFCL_PROJECT_ROOT"), d)
+
+
+@unittest.skipUnless(
+    os.environ.get("RUN_BFCL_LIVE") == "1",
+    "handler seam needs .venv-bfcl (imports bfcl_eval) — set RUN_BFCL_LIVE=1",
+)
+class HandlerToolCallNormalizeTest(unittest.TestCase):
+    """Defect A: malformed tool calls must not sink the next turn's
+    _format_prompt. Storage normalizes to the {'function': {name, arguments}}
+    envelope upstream unwraps, drops nameless entries, defaults arguments."""
+
+    def test_normalize_tool_calls_for_history(self):
+        from evals.components.bfcl.handler import _normalize_tool_calls_for_history
+        raw = [
+            {"name": "mkdir", "arguments": {"dir_name": "temp"}},   # bare form
+            {"function": {"name": "mv", "arguments": {"a": "b"}}},  # enveloped
+            {"name": "no_args"},                                     # missing arguments
+            {"arguments": {"x": 1}},                                 # no name -> dropped
+            "not-a-dict",                                            # junk -> dropped
+        ]
+        out = _normalize_tool_calls_for_history(raw)
+        self.assertEqual(
+            out,
+            [
+                {"function": {"name": "mkdir", "arguments": {"dir_name": "temp"}}},
+                {"function": {"name": "mv", "arguments": {"a": "b"}}},
+                {"function": {"name": "no_args", "arguments": {}}},
+            ],
+        )
 
 
 if __name__ == "__main__":

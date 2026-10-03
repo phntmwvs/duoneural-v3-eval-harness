@@ -142,6 +142,59 @@ def _iter_result_entries(result_obj):
                 yield record.get("id"), record
 
 
+def dedupe_result_file(result_file: str):
+    """Drop duplicate per-id records from a BFCL result file, keeping the first.
+
+    BFCL's threaded generation can append a second record for an id within one
+    clean run (observed live: a 200-prompt category file holding 336 JSONL
+    records — 200 unique ids, 136 duplicated once). BFCL's evaluate then reads
+    every line and asserts ``len(model_result) == len(prompt)`` (eval_runner),
+    which fails on the extras. Keep the first record for each id — the duplicate
+    is a re-run of the same conversation, and the first completed pass is the
+    canonical one. No-op for a missing file or a single-JSON-document file
+    (which holds one record per id by construction). Rewrites the file in
+    place only when duplicates were found.
+    """
+    if not os.path.exists(result_file):
+        return
+    with open(result_file, "r", encoding="utf-8") as fh:
+        lines = [ln for ln in fh.read().splitlines() if ln.strip()]
+    if not lines:
+        return
+    # Only dedup JSONL (one record per line); a single JSON document (which may
+    # itself span lines) is left untouched.
+    records = []
+    is_jsonl = True
+    for ln in lines:
+        try:
+            obj = json.loads(ln)
+        except json.JSONDecodeError:
+            is_jsonl = False
+            break
+        if not isinstance(obj, dict) or "id" not in obj:
+            is_jsonl = False
+            break
+        records.append((str(obj["id"]), ln))
+    if not is_jsonl:
+        return
+    seen = set()
+    kept = []
+    for test_id, ln in records:
+        if test_id in seen:
+            continue
+        seen.add(test_id)
+        kept.append(ln)
+    if len(kept) == len(records):
+        return  # no duplicates; leave the file byte-identical
+    # Crash-safe rewrite: write a temp file in the same dir, then atomically
+    # replace, so an interrupted dedup can't truncate the result file.
+    tmp_path = result_file + ".dedup.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as fh:
+        for ln in kept:
+            fh.write(ln + "\n")
+    os.replace(tmp_path, result_file)
+
+
 def count_turns_per_id(result_file: str):
     """Return ``{test_id: {"turns": n, "max_steps": m, "steps_per_turn": [...]}}``.
 

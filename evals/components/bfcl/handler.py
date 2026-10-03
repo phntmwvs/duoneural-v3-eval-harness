@@ -37,6 +37,36 @@ def _strip_thought(text: str) -> str:
     return _THOUGHT_RE.sub("", text)
 
 
+def _normalize_tool_calls_for_history(tool_calls):
+    """Wrap extracted tool calls for storage in chat history (Defect A).
+
+    ``_extract_tool_calls`` returns raw ``json.loads`` dicts with no shape
+    validation, so a malformed call (e.g. missing ``arguments``) can be stored
+    into ``chat_history_message["tool_calls"]``. On the next turn upstream
+    ``QwenFCHandler._format_prompt`` re-renders each stored call and does
+    ``tool_call["function"]["arguments"]`` (unwrapping the ``function``
+    envelope) — a missing key crashes that conversation (observed live on
+    ``multi_turn_base_65``). Normalize every stored call to the
+    ``{"function": {"name", "arguments"}}`` envelope upstream expects, and drop
+    entries with no usable ``name`` so a single malformed call can't sink the
+    conversation. Missing ``arguments`` defaults to ``{}`` (a no-arg call),
+    matching how ``decode_ast``/``decode_execute`` already index it.
+    """
+    normalized = []
+    for call in tool_calls:
+        if not isinstance(call, dict):
+            continue
+        fn = call.get("function") if isinstance(call.get("function"), dict) else call
+        name = fn.get("name")
+        if not name:
+            continue
+        arguments = fn.get("arguments")
+        if arguments is None:
+            arguments = {}
+        normalized.append({"function": {"name": name, "arguments": arguments}})
+    return normalized
+
+
 class DuoNeuralV3FCHandler(QwenFCHandler):
     """QwenFC-style handler with the DuoNeural v3 (<thought>) decode path."""
 
@@ -165,11 +195,12 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
             thought_content = parts[0].rstrip("\n").split("<thought>")[-1].lstrip("\n")
             cleaned_response = parts[-1].lstrip("\n")
 
-        if len(extracted_tool_calls) > 0:
+        normalized_tool_calls = _normalize_tool_calls_for_history(extracted_tool_calls)
+        if len(normalized_tool_calls) > 0:
             chat_history_message = {
                 "role": "assistant",
                 "content": "",
-                "tool_calls": extracted_tool_calls,
+                "tool_calls": normalized_tool_calls,
             }
         else:
             chat_history_message = {

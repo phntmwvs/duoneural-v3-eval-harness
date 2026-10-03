@@ -209,6 +209,17 @@ def run(checkpoint: str, *, base_url, model_name=None, resume=False,
         project_root=run_root,
     )
 
+    # --- dedup --------------------------------------------------------------
+    # Defect B: BFCL's threaded generation can append a duplicate record for an
+    # id within one clean run (observed live: 336 records / 200 unique ids).
+    # BFCL's evaluate asserts len(model_result) == len(prompt) and would fail on
+    # the extras, so drop duplicate ids (keep the first) before evaluating.
+    for category in categories:
+        result_file = normalize.find_result_file(result_root, model_key,
+                                                 category)
+        if result_file:
+            normalize.dedupe_result_file(result_file)
+
     # --- evaluate -----------------------------------------------------------
     run_bfcl_cli(
         build_evaluate_argv(model_key, categories,
