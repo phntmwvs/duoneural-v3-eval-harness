@@ -378,17 +378,21 @@ class RunBfclCliTest(unittest.TestCase):
 class LiveBfclCliSmokeTest(unittest.TestCase):
     """M2 acceptance: actually invoke run_bfcl_cli against the real bfcl_eval.
 
-    Skipped on the build host (no bfcl_eval); run inside .venv-bfcl on the MBP:
-        RUN_BFCL_LIVE=1 .venv-bfcl/bin/python -m unittest \\
-            tests.test_bfcl_adapter.LiveBfclCliSmokeTest -v
+    Skipped on the build host (no bfcl_eval); run inside .venv-bfcl on the MBP
+    (by file path — tests/ has no __init__.py, so the module path won't resolve):
+        RUN_BFCL_LIVE=1 .venv-bfcl/bin/python tests/test_bfcl_adapter.py \\
+            LiveBfclCliSmokeTest -v
     """
 
     def test_run_bfcl_cli_noop_command(self):
         import tempfile
         with tempfile.TemporaryDirectory() as d:
-            # `bfcl version` is a real no-op command: proves the typer/click
-            # dispatch works against the installed bfcl_eval without a model.
-            rc = runner.run_bfcl_cli(["version"], project_root=d)
+            # `bfcl test-categories` is a real no-op command (no model, no
+            # server, no dist-metadata lookup — unlike `bfcl version`, which
+            # needs the `bfcl` dist that isn't installed alongside bfcl_eval).
+            # It proves the typer/click dispatch works against the installed
+            # bfcl_eval.
+            rc = runner.run_bfcl_cli(["test-categories"], project_root=d)
             self.assertEqual(rc, 0)
             self.assertEqual(os.environ.get("BFCL_PROJECT_ROOT"), d)
 
