@@ -84,6 +84,7 @@ class ArgvBuilderTest(unittest.TestCase):
         self.assertEqual(custom[custom.index("--num-threads") + 1], "4")
 
     def test_evaluate_argv(self):
+        # Fresh run: no --partial-eval (checker enforces completeness, M1).
         argv = runner.build_evaluate_argv(
             "k", ("multi_turn_base",), result_dir="/r", score_dir="/s"
         )
@@ -91,8 +92,12 @@ class ArgvBuilderTest(unittest.TestCase):
         self.assertIn("--model", argv)
         self.assertIn("--score-dir", argv)
         self.assertIn("/s", argv)
-        # Adapter always evaluates partially (resume runs id-subsets).
-        self.assertIn("--partial-eval", argv)
+        self.assertNotIn("--partial-eval", argv)
+        # Resume run: --partial-eval passed (result files may hold id-subsets).
+        argv_resume = runner.build_evaluate_argv(
+            "k", ("multi_turn_base",), partial_eval=True
+        )
+        self.assertIn("--partial-eval", argv_resume)
 
 
 class ThrashGuardTest(unittest.TestCase):
@@ -178,10 +183,10 @@ class NormalizeTest(unittest.TestCase):
         self.assertEqual(counts["b"]["max_steps"], 4)
 
     def test_normalize_unweighted_mean_and_missing(self):
-        # Two of four categories scored.
+        # Two of four categories scored; one complete, one partial.
         self._score_file("k", "multi_turn_base", _score_records(0.5, 5, 10))
-        self._score_file("k", "multi_turn_miss_func", _score_records(1.0, 8, 8))
-        score, per_cat, missing = normalize.normalize(
+        self._score_file("k", "multi_turn_miss_func", _score_records(1.0, 200, 200))
+        score, per_cat, missing, partial = normalize.normalize(
             self.result_root, self.score_root, "k"
         )
         self.assertAlmostEqual(score, 0.75)  # unweighted mean of 0.5 and 1.0
@@ -189,14 +194,18 @@ class NormalizeTest(unittest.TestCase):
         self.assertEqual(
             set(missing), {"multi_turn_miss_param", "multi_turn_long_context"}
         )
+        # multi_turn_base scored 10/200 -> partial; miss_func 200/200 -> not.
+        self.assertEqual(partial, ["multi_turn_base"])
+        self.assertEqual(per_cat["multi_turn_base"]["expected_count"], 200)
 
     def test_normalize_none_when_nothing_scored(self):
-        score, per_cat, missing = normalize.normalize(
+        score, per_cat, missing, partial = normalize.normalize(
             self.result_root, self.score_root, "k"
         )
         self.assertIsNone(score)
         self.assertEqual(per_cat, {})
         self.assertEqual(len(missing), len(normalize.MULTI_TURN_CATEGORIES))
+        self.assertEqual(partial, [])
 
 
 class RunPipelineTest(unittest.TestCase):
@@ -217,11 +226,15 @@ class RunPipelineTest(unittest.TestCase):
             calls[op].append(list(argv))
             if op == "evaluate":
                 # Simulate bfcl evaluate writing all 4 category score files.
+                # First category is partial (5 < 200 expected) to exercise the
+                # M1 completeness gate; the rest are complete.
+                counts = {"multi_turn_base": 5}
                 for cat in normalize.MULTI_TURN_CATEGORIES:
+                    total = counts.get(cat, 200)
                     path = os.path.join(score_root, "duoneural-v3-mlx-fc",
                                         "multi_turn",
                                         normalize.score_filename(cat))
-                    _write_jsonl(path, _score_records(0.8, 4, 5))
+                    _write_jsonl(path, _score_records(0.8, int(0.8 * total), total))
             if op == "generate":
                 # Simulate bfcl generate writing one conversation's result.
                 path = os.path.join(result_root, "duoneural-v3-mlx-fc",
@@ -260,6 +273,10 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual(result["checkpoint"], "checkpoints/FakeCkpt")
         self.assertAlmostEqual(result["score"], 0.8)
         self.assertEqual(result["subscores"]["missing_categories"], [])
+        # M1 gate: multi_turn_base scored 5/200 -> partial; run not complete.
+        self.assertEqual(result["subscores"]["partial_categories"],
+                         ["multi_turn_base"])
+        self.assertFalse(result["subscores"]["complete"])
         self.assertFalse(result["subscores"]["thrash"]["flag"])
         self.assertEqual(
             result["subscores"]["thrash"]["step_counts"]
@@ -276,6 +293,8 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual(len(calls["generate"]), 1)
         self.assertIn("--allow-overwrite", calls["generate"][0])
         self.assertEqual(len(calls["evaluate"]), 1)
+        # Fresh run: --partial-eval omitted (checker enforces completeness).
+        self.assertNotIn("--partial-eval", calls["evaluate"][0])
 
     def test_resume_omits_allow_overwrite(self):
         result_root = os.path.join(self.run_root, "result")
@@ -286,6 +305,92 @@ class RunPipelineTest(unittest.TestCase):
 
         self.assertEqual(len(calls["generate"]), 1)
         self.assertNotIn("--allow-overwrite", calls["generate"][0])
+        # Resume: --partial-eval passed (result files may hold id-subsets).
+        self.assertIn("--partial-eval", calls["evaluate"][0])
+
+
+class RunBfclCliTest(unittest.TestCase):
+    """run_bfcl_cli drives the bfcl typer CLI in-process (M2).
+
+    bfcl_eval is stubbed so no real model/server is needed; this exercises the
+    typer/click invocation, the BFCL_PROJECT_ROOT env, and SystemExit handling
+    that RunPipelineTest stubs away.
+    """
+
+    def _patch_bfcl(self, recorded):
+        import types
+        from unittest import mock
+
+        def fake_get_command(cli):
+            def cmd(args=None, standalone_mode=True):
+                recorded["args"] = list(args)
+                recorded["standalone_mode"] = standalone_mode
+                return 0
+            return cmd
+
+        fake_typer = types.ModuleType("typer")
+        fake_typer.main = types.SimpleNamespace(get_command=fake_get_command)
+        fake_bfcl_main = types.ModuleType("bfcl_eval.__main__")
+        fake_bfcl_main.cli = object()
+        return mock.patch.dict(
+            sys.modules, {"typer": fake_typer, "bfcl_eval.__main__": fake_bfcl_main}
+        )
+
+    def test_invokes_cli_and_sets_project_root(self):
+        recorded = {}
+        with self._patch_bfcl(recorded):
+            runner.run_bfcl_cli(["generate", "--model", "k"],
+                                project_root="/tmp/bfclproj")
+        self.assertEqual(recorded["args"], ["generate", "--model", "k"])
+        self.assertFalse(recorded["standalone_mode"])
+        self.assertEqual(os.environ.get("BFCL_PROJECT_ROOT"), "/tmp/bfclproj")
+
+    def test_systemexit_zero_swallowed_nonzero_reraises(self):
+        import types
+        from unittest import mock
+
+        def make_cmd(code):
+            def cmd(args=None, standalone_mode=True):
+                raise SystemExit(code)
+            return cmd
+
+        for code, expect_raise in ((0, False), (2, True)):
+            fake_typer = types.ModuleType("typer")
+            fake_typer.main = types.SimpleNamespace(
+                get_command=lambda cli, c=code: make_cmd(c))
+            fake_bfcl_main = types.ModuleType("bfcl_eval.__main__")
+            fake_bfcl_main.cli = object()
+            with mock.patch.dict(sys.modules,
+                                 {"typer": fake_typer,
+                                  "bfcl_eval.__main__": fake_bfcl_main}):
+                if expect_raise:
+                    with self.assertRaises(SystemExit):
+                        runner.run_bfcl_cli(["evaluate"], project_root="/tmp/x")
+                else:
+                    self.assertEqual(
+                        runner.run_bfcl_cli(["evaluate"], project_root="/tmp/x"), 0)
+
+
+@unittest.skipUnless(
+    os.environ.get("RUN_BFCL_LIVE") == "1",
+    "live .venv-bfcl smoke test — set RUN_BFCL_LIVE=1 (needs bfcl_eval installed)",
+)
+class LiveBfclCliSmokeTest(unittest.TestCase):
+    """M2 acceptance: actually invoke run_bfcl_cli against the real bfcl_eval.
+
+    Skipped on the build host (no bfcl_eval); run inside .venv-bfcl on the MBP:
+        RUN_BFCL_LIVE=1 .venv-bfcl/bin/python -m unittest \\
+            tests.test_bfcl_adapter.LiveBfclCliSmokeTest -v
+    """
+
+    def test_run_bfcl_cli_noop_command(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            # `bfcl version` is a real no-op command: proves the typer/click
+            # dispatch works against the installed bfcl_eval without a model.
+            rc = runner.run_bfcl_cli(["version"], project_root=d)
+            self.assertEqual(rc, 0)
+            self.assertEqual(os.environ.get("BFCL_PROJECT_ROOT"), d)
 
 
 if __name__ == "__main__":

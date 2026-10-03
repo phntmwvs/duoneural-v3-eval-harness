@@ -83,7 +83,7 @@ def build_component_command(
     ``mlx_lm server`` the adapter runs against (real adapters require it; the
     stub ignores it).
     """
-    entry = COMPONENT_ENTRY[component]
+    entry = COMPONENT_ENTRY.get(component, "evals.components")  # stub default (M8)
     argv = [venv_python(component, repo_root)]
     argv += ["-m", entry]
     if entry in _NEEDS_COMPONENT_FLAG:

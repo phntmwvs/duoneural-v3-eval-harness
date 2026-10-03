@@ -13,3 +13,10 @@ bfcl_eval==2026.3.23
 # `ModuleNotFoundError: No module named 'soundfile'` on
 # `import bfcl_eval.constants.model_config`. Pin it explicitly (ticket #3 debug).
 soundfile
+
+# Direct imports of the adapter (evals/components/bfcl/) pinned explicitly rather
+# than relied on as bfcl_eval transitive deps (review M7): `requests` and
+# `typer` in handler.py / runner.py, `overrides` in handler.py / register.py.
+requests
+typer
+overrides

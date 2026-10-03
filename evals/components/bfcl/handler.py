@@ -21,7 +21,6 @@ Importable only inside ``.venv-bfcl`` (imports ``bfcl_eval``).
 
 from __future__ import annotations
 
-import ast
 import re
 from typing import Any
 
@@ -80,6 +79,7 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
             for _attempt in range(10):
                 try:
                     resp = requests.get("{0}/models".format(self.base_url), timeout=10)
+                    resp.raise_for_status()  # fail fast on non-200 (M3)
                     self._resolved_server_model = resp.json()["data"][0]["id"]
                     break
                 except Exception as e:  # connection reset / not-ready / parse
@@ -109,7 +109,8 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
         """
         result = _strip_thought(result)
         tool_calls = self._extract_tool_calls(result)
-        if type(tool_calls) != list or any(type(item) != dict for item in tool_calls):
+        if not isinstance(tool_calls, list) or \
+                any(not isinstance(item, dict) for item in tool_calls):
             raise ValueError(
                 "Model did not return a list of function calls: {0}".format(result)
             )
@@ -125,14 +126,11 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
 
     @override
     def decode_execute(self, result, has_tool_call_tag):
+        # _tool_calls_or_raise guarantees every element is a dict, so the
+        # literal-string branch the upstream QwenFCHandler carries is dead here
+        # (M4) — build the execute form straight from the dicts.
         tool_calls = self._tool_calls_or_raise(result)
-        decoded_result = []
-        for item in tool_calls:
-            if type(item) == str:
-                # Parse a literal call string. ast.literal_eval (not eval):
-                # model output is untrusted; a literal dict is all we accept.
-                item = ast.literal_eval(item)
-            decoded_result.append({item["name"]: item["arguments"]})
+        decoded_result = [{item["name"]: item["arguments"]} for item in tool_calls]
         return convert_to_function_call(decoded_result)
 
     @override
@@ -142,12 +140,18 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
         The inherited QwenFCHandler._format_prompt re-renders the assistant's
         stored ``reasoning_content`` inside ``<think>...</think>``. DuoNeural v3
         was trained on Hermes ``<thought>``; feeding it ``<think>`` on later
-        turns is a distribution mismatch. Qwen's rendering is otherwise
-        identical (same <|im_start|>/<|im_end|> roles, same <tool_call> /
-        <tool_response> XML), so we reuse it and swap the reasoning tag.
+        turns is a distribution mismatch.
+
+        The swap is scoped to the reasoning wrapper, not a blunt global
+        replace (M5): upstream's own template emits the wrapper only at a
+        message boundary as ``<think>\n<reasoning>\n</think>\n\n`` (qwen_fc.py
+        line 95), so ``<think>\n`` / ``</think>\n`` are unambiguous — a literal
+        ``<think>`` inside user/model content does not match and is left alone.
         """
         rendered = super()._format_prompt(messages, function)
-        return rendered.replace("<think>", "<thought>").replace("</think>", "</thought>")
+        return (rendered
+                .replace("<think>\n", "<thought>\n")
+                .replace("</think>\n", "</thought>\n"))
 
     @override
     def _parse_query_response_prompting(self, api_response: Any) -> dict:

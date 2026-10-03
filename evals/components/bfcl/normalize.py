@@ -38,6 +38,12 @@ MULTI_TURN_CATEGORIES = (
 #: Confirmed ``BFCL_v4`` against the installed ``bfcl_eval==2026.3.23``.
 VERSION_PREFIX = "BFCL_v4"
 
+#: Expected number of test entries per multi-turn category, confirmed against
+#: ``bfcl_eval==2026.3.23`` (``data/BFCL_v4_<category>.json`` — 200 lines each).
+#: Used to flag a partial/truncated run (ticket #17 review, M1): a category
+#: whose score ``total_count`` is below this did not evaluate the full set.
+EXPECTED_CATEGORY_COUNT = {category: 200 for category in MULTI_TURN_CATEGORIES}
+
 
 def result_filename(category: str) -> str:
     """BFCL's result-file name for a category."""
@@ -95,10 +101,13 @@ def read_score_accuracy(score_file: str):
     if not os.path.exists(score_file):
         return None
     data = _load_json_or_jsonl(score_file)
-    if not isinstance(data, list) or not data or not isinstance(data[0], dict):
-        return None
-    header = data[0]
-    if "accuracy" not in header:
+    header = None
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        header = data[0]
+    elif isinstance(data, dict):
+        # A single-record (or single-line) score file: the record IS the header.
+        header = data
+    if not isinstance(header, dict) or "accuracy" not in header:
         return None
     accuracy = header.get("accuracy")
     correct = header.get("correct_count")
@@ -192,16 +201,19 @@ def find_score_file(score_root: str, model_key: str, category: str):
 
 def normalize(result_root: str, score_root: str, model_key: str,
               categories=MULTI_TURN_CATEGORIES):
-    """Build ``(score, per_category, missing)`` from BFCL's output tree.
+    """Build ``(score, per_category, missing, partial)`` from BFCL's output.
 
     ``score`` is the unweighted mean of the available category accuracies
     (``None`` if no category scored). ``per_category`` maps each category to
-    ``{"accuracy", "correct_count", "total_count"}`` when present.
-    ``missing`` lists categories with no score file (or no usable header) so
-    the caller can surface an incomplete run.
+    ``{"accuracy", "correct_count", "total_count", "expected_count"}`` when
+    present. ``missing`` lists categories with no score file (or no usable
+    header). ``partial`` lists categories that scored but evaluated fewer
+    entries than expected (``total_count < expected_count``) — a truncated or
+    mid-resume run the caller must surface, not treat as complete (M1).
     """
     per_category = {}
     missing = []
+    partial = []
     accuracies = []
     for category in categories:
         score_file = find_score_file(score_root, model_key, category)
@@ -210,11 +222,16 @@ def normalize(result_root: str, score_root: str, model_key: str,
             missing.append(category)
             continue
         accuracy, correct, total = parsed
+        expected = EXPECTED_CATEGORY_COUNT.get(category)
         per_category[category] = {
             "accuracy": accuracy,
             "correct_count": correct,
             "total_count": total,
+            "expected_count": expected,
         }
+        if expected is not None and isinstance(total, (int, float)) \
+                and total < expected:
+            partial.append(category)
         accuracies.append(accuracy)
     score = (sum(accuracies) / len(accuracies)) if accuracies else None
-    return score, per_category, missing
+    return score, per_category, missing, partial

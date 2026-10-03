@@ -66,10 +66,13 @@ def main(argv=None) -> int:
         result["component"],
         result["model"],
     )
-    print("[component:bfcl] score={0:.4f} thrash_flag={1} missing={2}".format(
+    print("[component:bfcl] score={0:.4f} complete={1} thrash_flag={2} "
+          "missing={3} partial={4}".format(
         result["score"],
+        result["subscores"]["complete"],
         result["subscores"]["thrash"]["flag"],
         result["subscores"]["missing_categories"],
+        result["subscores"]["partial_categories"],
     ))
     print("[component:bfcl] result written: {0}".format(path))
     return 0

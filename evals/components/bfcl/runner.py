@@ -88,13 +88,15 @@ def build_generate_argv(model_key: str, categories, *,
 
 
 def build_evaluate_argv(model_key: str, categories, *, result_dir=None,
-                        score_dir=None, partial_eval=True):
+                        score_dir=None, partial_eval=False):
     """Argv (after ``bfcl``) for one ``bfcl evaluate`` invocation.
 
-    ``--partial-eval`` is always passed: the adapter legitimately runs
-    id-subsets (``--resume`` skips complete ids), and BFCL's checker otherwise
-    raises "Length of model result (N) does not match length of test entries"
-    when a category's result file holds fewer entries than the full prompt set.
+    ``--partial-eval`` is passed only when the run is a resume (``resume=True``
+    → the caller sets ``partial_eval=True``): BFCL's checker otherwise raises
+    "Length of model result (N) does not match length of test entries" when a
+    category's result file holds fewer entries than the full prompt set. On a
+    fresh full run it is omitted so the checker enforces completeness (M1);
+    the normalizer separately flags any category that still comes back short.
     """
     argv = [
         "evaluate",
@@ -210,12 +212,13 @@ def run(checkpoint: str, *, base_url, model_name=None, resume=False,
     # --- evaluate -----------------------------------------------------------
     run_bfcl_cli(
         build_evaluate_argv(model_key, categories,
-                            result_dir=result_root, score_dir=score_root),
+                            result_dir=result_root, score_dir=score_root,
+                            partial_eval=resume),
         project_root=run_root,
     )
 
     # --- normalize + thrash guard -------------------------------------------
-    score, per_category, missing = normalize.normalize(
+    score, per_category, missing, partial = normalize.normalize(
         result_root, score_root, model_key, categories
     )
     turn_counts = {}
@@ -242,6 +245,8 @@ def run(checkpoint: str, *, base_url, model_name=None, resume=False,
         subscores={
             "per_category": per_category,
             "missing_categories": missing,
+            "partial_categories": partial,
+            "complete": not missing and not partial,
             "resume": bool(resume),
             "thrash": thrash,
         },

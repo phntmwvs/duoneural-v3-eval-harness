@@ -9,6 +9,7 @@ __pycache__/
 # Checkpoints + results (large / machine-local / never committed)
 checkpoints/
 evals/results/
+evals/bfcl_runs/
 
 # OS
 .DS_Store

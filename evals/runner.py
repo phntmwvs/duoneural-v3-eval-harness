@@ -40,9 +40,14 @@ class ComponentRunner(Protocol):
     The adapter receives a live ``base_url`` from the shared ``ServerManager``
     (it never starts ``mlx_lm server`` itself) and returns a dict matching
     ``RESULT_KEYS`` — validate with ``validate_result`` before writing.
+
+    Adapters are dispatched as modules (``python -m evals.components.<comp>``),
+    so the component id is a module-level constant named ``COMPONENT`` (e.g.
+    ``evals/components/bfcl/runner.py: COMPONENT = "bfcl"``), not a class
+    attribute.
     """
 
-    name: str
+    COMPONENT: str
 
     def run(self, checkpoint: str, *, base_url: str, resume: bool = False) -> dict[str, Any]:
         """Run the component against ``checkpoint`` served at ``base_url`` and
