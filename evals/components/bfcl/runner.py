@@ -75,8 +75,14 @@ def build_generate_argv(model_key: str, categories, *, run_ids=None,
 
 
 def build_evaluate_argv(model_key: str, categories, *, result_dir=None,
-                        score_dir=None):
-    """Argv (after ``bfcl``) for one ``bfcl evaluate`` invocation."""
+                        score_dir=None, partial_eval=True):
+    """Argv (after ``bfcl``) for one ``bfcl evaluate`` invocation.
+
+    ``--partial-eval`` is always passed: the adapter legitimately runs
+    id-subsets (``--resume`` skips complete ids), and BFCL's checker otherwise
+    raises "Length of model result (N) does not match length of test entries"
+    when a category's result file holds fewer entries than the full prompt set.
+    """
     argv = [
         "evaluate",
         "--model", model_key,
@@ -86,6 +92,8 @@ def build_evaluate_argv(model_key: str, categories, *, result_dir=None,
         argv += ["--result-dir", str(result_dir)]
     if score_dir is not None:
         argv += ["--score-dir", str(score_dir)]
+    if partial_eval:
+        argv.append("--partial-eval")
     return argv
 
 

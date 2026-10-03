@@ -70,6 +70,8 @@ class ArgvBuilderTest(unittest.TestCase):
         self.assertIn("--model", argv)
         self.assertIn("--score-dir", argv)
         self.assertIn("/s", argv)
+        # Adapter always evaluates partially (resume runs id-subsets).
+        self.assertIn("--partial-eval", argv)
 
 
 class ThrashGuardTest(unittest.TestCase):
