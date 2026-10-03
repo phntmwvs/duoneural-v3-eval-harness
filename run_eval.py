@@ -53,25 +53,23 @@ def build_component_command(
     component: str,
     model: str,
     *,
+    model_name: str,
     resume: bool = False,
-    emit_stub: bool = False,
     repo_root: str = REPO_ROOT,
 ) -> list[str]:
     """Argv that runs the component's adapter in its own venv.
 
-    Real adapters (#17/#18/#19) expose ``python -m evals.components.<component>``
-    and parse the same flags. ``--emit-stub`` selects the scaffold's
-    contract-valid stub emitter instead (no adapter needed yet).
+    Real adapters (#17/#18/#19) expose ``python -m evals.components`` (their
+    own ``__main__``) and parse the same flags. ``model`` is the checkpoint ref
+    (local dir or HF id); ``model_name`` is the distinct matrix row name that
+    the result ``model`` field / filename uses.
     """
     argv = [venv_python(component, repo_root)]
-    if emit_stub:
-        argv += [os.path.join(repo_root, "run_eval.py"), "--emit-stub"]
-    else:
-        # Scaffold stub entry point. A real adapter (#17/#18/#19) replaces this
-        # with its own ``python -m evals.components.<component>`` __main__ in
-        # its venv; run_eval's dispatch target is the package stub until then.
-        argv += ["-m", "evals.components"]
-    argv += ["--component", component, "--model", model]
+    # Scaffold stub entry point. A real adapter (#17/#18/#19) replaces this
+    # with its own ``python -m evals.components.<component>`` __main__ in its
+    # venv; run_eval's dispatch target is the package stub until then.
+    argv += ["-m", "evals.components"]
+    argv += ["--component", component, "--model", model, "--model-name", model_name]
     if resume:
         argv.append("--resume")
     return argv
@@ -81,22 +79,34 @@ def run_component(
     component: str,
     model: str,
     *,
+    model_name: str | None = None,
     resume: bool = False,
     emit_stub: bool = False,
     dry_run: bool = False,
     repo_root: str = REPO_ROOT,
 ) -> int:
-    """Dispatch one component in its venv; return its exit code."""
-    argv = build_component_command(
-        component, model, resume=resume, emit_stub=emit_stub, repo_root=repo_root
-    )
-    python = argv[0]
+    """Dispatch one component in its venv; return its exit code.
+
+    ``model`` is the checkpoint ref (``--model``); ``model_name`` is the matrix
+    row name used for the result ``model`` field and filename — it defaults to
+    ``model`` so callers that pass a row name as ``--model`` are unaffected,
+    but an HF-id checkpoint should pass a slug-safe ``--model-name``.
+    """
+    if model_name is None:
+        model_name = model
     if dry_run:
+        argv = build_component_command(
+            component, model, model_name=model_name, resume=resume, repo_root=repo_root
+        )
         print("[run_eval] dry-run: {0}".format(" ".join(argv)))
         return 0
     # --emit-stub is a scaffold prove-out: emit in-process, no venv required.
     if emit_stub:
-        return _emit_stub(component, model, repo_root)
+        return _emit_stub(component, model, model_name=model_name, repo_root=repo_root)
+    argv = build_component_command(
+        component, model, model_name=model_name, resume=resume, repo_root=repo_root
+    )
+    python = argv[0]
     if not os.path.exists(python):
         print(
             "[run_eval] ERROR: venv python not found: {0}\n"
@@ -109,17 +119,20 @@ def run_component(
     return proc.returncode
 
 
-def _emit_stub(component: str, model: str, repo_root: str = REPO_ROOT) -> int:
+def _emit_stub(
+    component: str, checkpoint: str, *, model_name: str, repo_root: str = REPO_ROOT
+) -> int:
     """Write a contract-valid placeholder result (scaffold prove-out only).
 
     Stands in for a real adapter until #17/#18/#19 land, so the result schema
     and the write path are exercised without a component. ``score`` is a
     placeholder, NOT a measurement — real scores come from the adapters.
+    ``model`` (the row name) and ``checkpoint`` (the ref) are kept distinct.
     """
     result = results_mod.new_result(
         component=component,
-        model=model,
-        checkpoint=model,
+        model=model_name,
+        checkpoint=checkpoint,
         score=0.0,
         subscores={"stub": True, "note": "placeholder from run_eval --emit-stub; not a real score"},
         runtime_s=0.0,
@@ -147,6 +160,13 @@ def main(argv: list[str] | None = None) -> int:
         help="checkpoint ref: local dir for the quants, HF id for the base row",
     )
     p.add_argument(
+        "--model-name",
+        default=None,
+        help="matrix row name for the result model field / filename (e.g. "
+        "'bf16', 'base'). Defaults to --model; pass a slug-safe name when "
+        "--model is an HF id containing '/'.",
+    )
+    p.add_argument(
         "--resume",
         action="store_true",
         help="continue an interrupted run from persisted state (BFCL per-id resume)",
@@ -165,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     return run_component(
         args.component,
         args.model,
+        model_name=args.model_name,
         resume=args.resume,
         emit_stub=args.emit_stub,
         dry_run=args.dry_run,

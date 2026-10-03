@@ -157,7 +157,7 @@ class ServerManager:
                 data = payload.get("data") or []
                 if data and data[0].get("id"):
                     return str(data[0]["id"])
-            except (urllib.error.URLError, ValueError, KeyError, IndexError, OSError):
+            except (urllib.error.URLError, ValueError, KeyError, IndexError, AttributeError, OSError):
                 pass
             if time.monotonic() >= deadline:
                 raise TimeoutError(

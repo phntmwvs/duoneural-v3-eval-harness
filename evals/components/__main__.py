@@ -23,13 +23,19 @@ from evals import results as results_mod  # noqa: E402
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="Component adapter stub (ticket #16)")
     p.add_argument("--component", required=True, choices=list(results_mod.COMPONENTS))
-    p.add_argument("--model", required=True)
+    p.add_argument("--model", required=True, help="checkpoint ref (local dir or HF id)")
+    p.add_argument(
+        "--model-name",
+        default=None,
+        help="matrix row name for the result model field / filename; defaults to --model",
+    )
     p.add_argument("--resume", action="store_true")
     args = p.parse_args(argv)
 
+    model_name = args.model_name if args.model_name is not None else args.model
     result = results_mod.new_result(
         component=args.component,
-        model=args.model,
+        model=model_name,
         checkpoint=args.model,
         score=0.0,
         subscores={

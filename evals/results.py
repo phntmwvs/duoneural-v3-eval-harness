@@ -74,6 +74,11 @@ def new_result(
     }
 
 
+def _is_number(x) -> bool:
+    """Numeric but not bool (bool is a subclass of int)."""
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
 def validate_result(result: dict) -> list[str]:
     """Return a list of schema violations (empty list = valid)."""
     errors = []
@@ -85,24 +90,39 @@ def validate_result(result: dict) -> list[str]:
     component = result.get("component")
     if component is not None and component not in COMPONENTS:
         errors.append("component {0!r} not in {1}".format(component, COMPONENTS))
-    if "score" in result and not isinstance(result["score"], (int, float)):
+    if "score" in result and not _is_number(result["score"]):
         errors.append("score is not numeric: {0!r}".format(type(result["score"]).__name__))
     if "subscores" in result and not isinstance(result["subscores"], dict):
         errors.append("subscores is not a dict")
     if "artifact_versions" in result and not isinstance(result["artifact_versions"], dict):
         errors.append("artifact_versions is not a dict")
-    if "runtime_s" in result and not isinstance(result["runtime_s"], (int, float)):
+    if "runtime_s" in result and not _is_number(result["runtime_s"]):
         errors.append("runtime_s is not numeric")
     return errors
 
 
-def result_path(results_dir: str, component: str, model: str) -> str:
-    """Path a component's result JSON is written to (one file per run).
+def slug_filename(value: str) -> str:
+    """Make ``value`` safe as a single filename component.
 
-    ``evals/results/`` is gitignored; files are JSON-per-run named
-    ``<component>-<model>.json`` so the matrix's A/B delta can glob one row.
+    Model refs can be HF ids (``LiquidAI/LFM2.5-8B-A1B``) whose ``/`` would
+    otherwise be read as a path separator, and ``..`` could escape the results
+    dir. Slug both (and os.sep variants) to ``__`` so the filename can never
+    traverse the filesystem.
     """
-    return os.path.join(results_dir, "{0}-{1}.json".format(component, model))
+    safe = value.replace("/", "__").replace("\\", "__").replace("..", "__")
+    return safe
+
+
+def result_path(results_dir: str, component: str, model: str) -> str:
+    """Path a component's result JSON is written to.
+
+    ``evals/results/`` is gitignored; files are JSON named
+    ``<component>-<slugged model>.json`` so the matrix's A/B delta can glob one
+    row. The name is deterministic per ``(component, model)``: a re-run
+    (including ``--resume``) overwrites that row's prior file, which is
+    intended — the matrix runs each row once and keeps the latest.
+    """
+    return os.path.join(results_dir, "{0}-{1}.json".format(component, slug_filename(model)))
 
 
 def write_result(result: dict, results_dir: str) -> str:
