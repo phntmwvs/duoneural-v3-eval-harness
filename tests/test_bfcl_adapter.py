@@ -62,14 +62,15 @@ class ArgvBuilderTest(unittest.TestCase):
         self.assertNotIn("--run-ids", argv)
         self.assertNotIn("--allow-overwrite", argv)
 
-    def test_generate_argv_run_ids_and_overwrite(self):
+    def test_generate_argv_overwrite_and_result_dir(self):
         argv = runner.build_generate_argv(
-            "k", ("multi_turn_base",), run_ids=True, allow_overwrite=True,
+            "k", ("multi_turn_base",), allow_overwrite=True,
             result_dir="/tmp/res",
         )
-        self.assertIn("--run-ids", argv)
         self.assertIn("--allow-overwrite", argv)
         self.assertIn("/tmp/res", argv)
+        # --run-ids is no longer emitted: resume uses BFCL's native skip.
+        self.assertNotIn("--run-ids", argv)
 
     def test_evaluate_argv(self):
         argv = runner.build_evaluate_argv(
@@ -112,49 +113,23 @@ class ThrashGuardTest(unittest.TestCase):
         self.assertEqual(t["step_counts"]["thrashy"]["max_steps"], 21)
 
 
-class ResumePlannerTest(unittest.TestCase):
-    def setUp(self):
-        import tempfile
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.result_root = os.path.join(self.tmp.name, "result")
+class ResumeSemanticsTest(unittest.TestCase):
+    """--resume delegates to BFCL's native per-id skip (decision 7a).
 
-    def _result_file(self, model_key, category, payload):
-        path = os.path.join(self.result_root, model_key, "multi_turn",
-                            normalize.result_filename(category))
-        _write(path, payload)
-        return path
+    The adapter no longer computes an id plan: on resume it simply omits
+    ``--allow-overwrite`` so BFCL reloads existing result files and generates
+    only missing ids. These tests assert that contract at the argv level.
+    """
 
-    def test_full_regen_when_no_result_file(self):
-        plan = runner.ids_to_run(self.result_root, "k", ("multi_turn_base",))
-        self.assertEqual(plan["multi_turn_base"], ["__all__"])
+    def test_resume_omits_allow_overwrite(self):
+        argv = runner.build_generate_argv("k", ("multi_turn_base",),
+                                          allow_overwrite=False)
+        self.assertNotIn("--allow-overwrite", argv)
 
-    def test_skip_when_complete_no_id_list(self):
-        self._result_file("k", "multi_turn_base",
-                          _result_payload({"multi_turn_base_0": [4]}))
-        plan = runner.ids_to_run(self.result_root, "k", ("multi_turn_base",))
-        self.assertEqual(plan["multi_turn_base"], [])  # done -> skip
-
-    def test_partial_with_id_list(self):
-        self._result_file("k", "multi_turn_base",
-                          _result_payload({"multi_turn_base_0": [4]}))
-        requested = {"multi_turn_base": ["multi_turn_base_0", "multi_turn_base_1"]}
-        plan = runner.ids_to_run(self.result_root, "k", ("multi_turn_base",),
-                                 requested_ids=requested)
-        # _0 done, _1 still to run
-        self.assertEqual(plan["multi_turn_base"], ["multi_turn_base_1"])
-
-    def test_ids_file_excludes_wildcards_and_empty(self):
-        plan = {
-            "multi_turn_base": ["multi_turn_base_1"],
-            "multi_turn_miss_func": ["__all__"],
-            "multi_turn_long_context": [],
-        }
-        path = os.path.join(self.tmp.name, "ids.json")
-        runner.write_ids_file(path, plan)
-        with open(path) as fh:
-            payload = json.load(fh)
-        self.assertEqual(payload, {"multi_turn_base": ["multi_turn_base_1"]})
+    def test_fresh_run_passes_allow_overwrite(self):
+        argv = runner.build_generate_argv("k", ("multi_turn_base",),
+                                          allow_overwrite=True)
+        self.assertIn("--allow-overwrite", argv)
 
 
 class NormalizeTest(unittest.TestCase):
@@ -190,13 +165,6 @@ class NormalizeTest(unittest.TestCase):
         self.assertEqual(counts["a"]["steps_per_turn"], [3, 5])
         self.assertEqual(counts["a"]["max_steps"], 5)
         self.assertEqual(counts["b"]["max_steps"], 4)
-
-    def test_completed_ids_requires_nonempty_turns(self):
-        path = os.path.join(self.result_root, "k", "multi_turn",
-                            normalize.result_filename("multi_turn_base"))
-        _write(path, {"done": {"id": "done", "result": [[{"name": "f"}]]},
-                      "empty": {"id": "empty", "result": []}})
-        self.assertEqual(normalize.completed_ids(path), {"done"})
 
     def test_normalize_unweighted_mean_and_missing(self):
         # Two of four categories scored.
@@ -252,29 +220,29 @@ class RunPipelineTest(unittest.TestCase):
 
         return fake_cli, calls
 
-    def test_run_emits_normalized_result(self):
+    def _run(self, fake_cli, *, resume=False):
         import types
         from unittest import mock
+        fake_register = types.ModuleType("evals.components.bfcl.register")
+        fake_register.register = lambda *a, **k: "duoneural-v3-mlx-fc"
+        with mock.patch.dict(sys.modules,
+                             {"evals.components.bfcl.register": fake_register}), \
+             mock.patch.object(runner, "run_bfcl_cli", side_effect=fake_cli):
+            return runner.run(
+                "checkpoints/FakeCkpt",
+                base_url="http://127.0.0.1:9/v1",
+                model_name="fakerow",
+                resume=resume,
+                run_root=self.run_root,
+                results_dir=self.results_dir,
+            )
 
+    def test_run_emits_normalized_result(self):
         result_root = os.path.join(self.run_root, "result")
         score_root = os.path.join(self.run_root, "score")
         fake_cli, calls = self._fake_cli_factory(result_root, score_root)
 
-        # register is imported inside run() from .register; give it a stub
-        # module so run() never imports bfcl_eval.
-        fake_register = types.ModuleType("evals.components.bfcl.register")
-        fake_register.register = lambda *a, **k: "duoneural-v3-mlx-fc"
-
-        with mock.patch.dict(sys.modules,
-                             {"evals.components.bfcl.register": fake_register}), \
-             mock.patch.object(runner, "run_bfcl_cli", side_effect=fake_cli):
-            result = runner.run(
-                "checkpoints/FakeCkpt",
-                base_url="http://127.0.0.1:9/v1",
-                model_name="fakerow",
-                run_root=self.run_root,
-                results_dir=self.results_dir,
-            )
+        result = self._run(fake_cli, resume=False)
 
         self.assertEqual(result["component"], "bfcl")
         self.assertEqual(result["model"], "fakerow")
@@ -293,9 +261,20 @@ class RunPipelineTest(unittest.TestCase):
             on_disk = json.load(fh)
         from evals import results as results_mod
         self.assertEqual(results_mod.validate_result(on_disk), [])
-        # generate ran (no resume), evaluate ran once.
+        # generate ran (fresh: --allow-overwrite), evaluate ran once.
         self.assertEqual(len(calls["generate"]), 1)
+        self.assertIn("--allow-overwrite", calls["generate"][0])
         self.assertEqual(len(calls["evaluate"]), 1)
+
+    def test_resume_omits_allow_overwrite(self):
+        result_root = os.path.join(self.run_root, "result")
+        score_root = os.path.join(self.run_root, "score")
+        fake_cli, calls = self._fake_cli_factory(result_root, score_root)
+
+        self._run(fake_cli, resume=True)
+
+        self.assertEqual(len(calls["generate"]), 1)
+        self.assertNotIn("--allow-overwrite", calls["generate"][0])
 
 
 if __name__ == "__main__":

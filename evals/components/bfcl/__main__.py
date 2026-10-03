@@ -3,14 +3,16 @@
 ``run_eval.py`` dispatches to ``python -m evals.components.bfcl`` inside
 ``.venv-bfcl``. This parses the shared adapter flags (``--model`` /
 ``--model-name`` / ``--resume``) and drives the full BFCL v3 multi-turn
-pipeline: serve (if no ``--base-url``) → generate → evaluate → normalize →
-write the harness result JSON.
+pipeline against the live ``mlx_lm server`` handed to it via ``--base-url``:
+generate → evaluate → normalize → write the harness result JSON.
+
+Per the runner contract (``evals/runner.py``) the adapter never owns serve:
+the shared ``ServerManager`` (ticket #16) / matrix (ticket #20) brings the
+server up and passes its ``--base-url``.
 
     .venv-bfcl/bin/python -m evals.components.bfcl \
-        --model checkpoints/DuoNeural-v3-4bit --model-name 4bit [--resume]
-
-``--base-url`` lets the matrix (ticket #20) hand in an already-running server
-instead of this component owning one.
+        --model checkpoints/DuoNeural-v3-4bit --model-name 4bit \
+        --base-url http://127.0.0.1:8080/v1 [--resume]
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ _REPO_ROOT = os.path.dirname(
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
+from evals import results as results_mod  # noqa: E402
 from evals.components.bfcl import normalize, runner  # noqa: E402
 
 
@@ -35,12 +38,12 @@ def main(argv=None) -> int:
     p.add_argument("--model-name", default=None,
                    help="matrix row name for the result model field / filename; "
                         "defaults to --model")
-    p.add_argument("--base-url", default=None,
-                   help="use an already-running mlx_lm server (matrix mode); "
-                        "when omitted this component serves --model itself")
+    p.add_argument("--base-url", required=True,
+                   help="live mlx_lm server OpenAI base URL handed in by the "
+                        "shared ServerManager / matrix (the adapter never serves)")
     p.add_argument("--resume", action="store_true",
-                   help="skip categories whose result/<model>/ file is complete "
-                        "(ticket #6, decision 7a)")
+                   help="skip ids already complete in result/<model>/ "
+                        "(BFCL native per-id resume; ticket #6, decision 7a)")
     p.add_argument("--categories", default=",".join(normalize.MULTI_TURN_CATEGORIES),
                    help="comma-separated BFCL categories (default: the 4 multi-turn)")
     args = p.parse_args(argv)
@@ -53,16 +56,17 @@ def main(argv=None) -> int:
         resume=args.resume,
         categories=tuple(categories),
     )
-    out = os.path.join(
-        _REPO_ROOT, "evals", "results",
-        "bfcl-{0}.json".format(args.model_name or args.model),
+    path = results_mod.result_path(
+        os.path.join(_REPO_ROOT, "evals", "results"),
+        result["component"],
+        result["model"],
     )
     print("[component:bfcl] score={0:.4f} thrash_flag={1} missing={2}".format(
         result["score"],
         result["subscores"]["thrash"]["flag"],
         result["subscores"]["missing_categories"],
     ))
-    print("[component:bfcl] result written under evals/results/ ({0})".format(out))
+    print("[component:bfcl] result written: {0}".format(path))
     return 0
 
 

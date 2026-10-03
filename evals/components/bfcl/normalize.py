@@ -89,20 +89,16 @@ def read_score_accuracy(score_file: str):
 
     The score file is JSONL whose first record is the header dict inserted by
     ``save_eval_results`` (``accuracy`` / ``correct_count`` / ``total_count``);
-    later records are per-entry results. Tolerates a single-JSON-document file
-    whose element 0 is the header. Returns ``None`` if missing or no usable
-    header.
+    later records are per-entry results. Returns ``None`` if missing or the
+    header is unusable.
     """
     if not os.path.exists(score_file):
         return None
     data = _load_json_or_jsonl(score_file)
-    header = None
-    if isinstance(data, list) and data and isinstance(data[0], dict):
-        header = data[0]
-    elif isinstance(data, dict):
-        # Single JSON document that is itself the header.
-        header = data
-    if not isinstance(header, dict) or "accuracy" not in header:
+    if not isinstance(data, list) or not data or not isinstance(data[0], dict):
+        return None
+    header = data[0]
+    if "accuracy" not in header:
         return None
     accuracy = header.get("accuracy")
     correct = header.get("correct_count")
@@ -169,55 +165,29 @@ def count_turns_per_id(result_file: str):
     return counts
 
 
-def completed_ids(result_file: str):
-    """Return the set of test-ids with a complete record in a result file.
+def _find_file(root: str, model_key: str, target: str):
+    """Locate ``target`` under ``root/<model_key>/`` by recursive walk.
 
-    ``--resume`` semantics (ticket #6, decision 7a): a test-id counts as done
-    when its record exists in the category's ``result/<model>/`` file and
-    carries a non-empty per-turn ``result`` list. BFCL's own ``--run-ids``
-    writes only the ids it (re)generated, so a record's presence means it
-    completed.
-    """
-    if not os.path.exists(result_file):
-        return set()
-    try:
-        obj = _load_json(result_file)
-    except (ValueError, OSError):
-        return set()
-    done = set()
-    for test_id, record in _iter_result_entries(obj):
-        if test_id is None or not isinstance(record, dict):
-            continue
-        turns = record.get("result")
-        if isinstance(turns, list) and len(turns) > 0:
-            done.add(str(test_id))
-    return done
-
-
-def find_result_file(result_root: str, model_key: str, category: str):
-    """Locate a category's result file under ``result_root/<model_key>/``.
-
-    BFCL nests results in a category-specific subdirectory
+    BFCL nests output in a category-specific subdirectory
     (``get_directory_structure_by_category``); for the multi-turn categories
     that is ``multi_turn``. Search recursively so we do not hard-code the
     subdirectory depth.
     """
-    target = result_filename(category)
-    base = os.path.join(result_root, model_key)
+    base = os.path.join(root, model_key)
     for dirpath, _dirnames, filenames in os.walk(base):
         if target in filenames:
             return os.path.join(dirpath, target)
     return None
+
+
+def find_result_file(result_root: str, model_key: str, category: str):
+    """Locate a category's result file under ``result_root/<model_key>/``."""
+    return _find_file(result_root, model_key, result_filename(category))
 
 
 def find_score_file(score_root: str, model_key: str, category: str):
     """Locate a category's score file under ``score_root/<model_key>/``."""
-    target = score_filename(category)
-    base = os.path.join(score_root, model_key)
-    for dirpath, _dirnames, filenames in os.walk(base):
-        if target in filenames:
-            return os.path.join(dirpath, target)
-    return None
+    return _find_file(score_root, model_key, score_filename(category))
 
 
 def normalize(result_root: str, score_root: str, model_key: str,

@@ -152,6 +152,18 @@ class BuildCommandTest(unittest.TestCase):
         argv = run_eval.build_component_command("bfcl", "m", model_name="m", resume=True)
         self.assertIn("--resume", argv)
 
+    def test_base_url_forwarded_when_given(self):
+        argv = run_eval.build_component_command(
+            "bfcl", "m", model_name="m", base_url="http://127.0.0.1:8080/v1"
+        )
+        self.assertIn("--base-url", argv)
+        i = argv.index("--base-url")
+        self.assertEqual(argv[i + 1], "http://127.0.0.1:8080/v1")
+
+    def test_base_url_omitted_when_not_given(self):
+        argv = run_eval.build_component_command("bfcl", "m", model_name="m")
+        self.assertNotIn("--base-url", argv)
+
     def test_model_name_defaults_to_model(self):
         argv = run_eval.build_component_command("bfcl", "bf16", model_name="bf16")
         i = argv.index("--model-name")

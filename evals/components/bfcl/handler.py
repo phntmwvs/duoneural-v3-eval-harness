@@ -89,12 +89,21 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
         self.model_path_or_id = self._server_model_id()
         return super()._query_prompting(inference_data)
 
-    @override
-    def decode_ast(self, result, language, has_tool_call_tag):
+    def _tool_calls_or_raise(self, result):
+        """Strip <thought> and extract tool calls, raising on a non-list.
+
+        Shared by decode_ast / decode_execute: same strip → extract → guard
+        (the guard idiom matches the upstream QwenFCHandler).
+        """
         result = _strip_thought(result)
         tool_calls = self._extract_tool_calls(result)
         if type(tool_calls) != list or any(type(item) != dict for item in tool_calls):
             raise ValueError(f"Model did not return a list of function calls: {result}")
+        return tool_calls
+
+    @override
+    def decode_ast(self, result, language, has_tool_call_tag):
+        tool_calls = self._tool_calls_or_raise(result)
         return [
             {call["name"]: {k: v for k, v in call["arguments"].items()}}
             for call in tool_calls
@@ -102,14 +111,11 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
 
     @override
     def decode_execute(self, result, has_tool_call_tag):
-        result = _strip_thought(result)
-        tool_calls = self._extract_tool_calls(result)
-        if type(tool_calls) != list or any(type(item) != dict for item in tool_calls):
-            raise ValueError(f"Model did not return a list of function calls: {result}")
+        tool_calls = self._tool_calls_or_raise(result)
         decoded_result = []
         for item in tool_calls:
             if type(item) == str:
-                item = eval(item)
+                item = eval(item)  # upstream path: parse a literal call string
             decoded_result.append({item["name"]: item["arguments"]})
         return convert_to_function_call(decoded_result)
 
