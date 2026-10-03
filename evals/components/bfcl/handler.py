@@ -21,6 +21,7 @@ Importable only inside ``.venv-bfcl`` (imports ``bfcl_eval``).
 
 from __future__ import annotations
 
+import ast
 import re
 from typing import Any
 
@@ -78,7 +79,7 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
             last_err = None
             for _attempt in range(10):
                 try:
-                    resp = requests.get(f"{self.base_url}/models", timeout=10)
+                    resp = requests.get("{0}/models".format(self.base_url), timeout=10)
                     self._resolved_server_model = resp.json()["data"][0]["id"]
                     break
                 except Exception as e:  # connection reset / not-ready / parse
@@ -87,8 +88,10 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
             if self._resolved_server_model is None:
                 raise RuntimeError(
                     "[bfcl] could not resolve the served model id from "
-                    f"{self.base_url}/models after retries ({last_err}); refusing "
-                    "to send the registry key, which mlx_lm would 404 as an HF id."
+                    "{0}/models after retries ({1}); refusing "
+                    "to send the registry key, which mlx_lm would 404 as an HF id.".format(
+                        self.base_url, last_err
+                    )
                 )
         return self._resolved_server_model
 
@@ -107,7 +110,9 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
         result = _strip_thought(result)
         tool_calls = self._extract_tool_calls(result)
         if type(tool_calls) != list or any(type(item) != dict for item in tool_calls):
-            raise ValueError(f"Model did not return a list of function calls: {result}")
+            raise ValueError(
+                "Model did not return a list of function calls: {0}".format(result)
+            )
         return tool_calls
 
     @override
@@ -124,7 +129,9 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
         decoded_result = []
         for item in tool_calls:
             if type(item) == str:
-                item = eval(item)  # upstream path: parse a literal call string
+                # Parse a literal call string. ast.literal_eval (not eval):
+                # model output is untrusted; a literal dict is all we accept.
+                item = ast.literal_eval(item)
             decoded_result.append({item["name"]: item["arguments"]})
         return convert_to_function_call(decoded_result)
 
