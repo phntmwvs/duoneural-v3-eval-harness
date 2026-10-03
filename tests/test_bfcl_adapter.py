@@ -72,6 +72,17 @@ class ArgvBuilderTest(unittest.TestCase):
         # --run-ids is no longer emitted: resume uses BFCL's native skip.
         self.assertNotIn("--run-ids", argv)
 
+    def test_generate_argv_caps_threads_for_mlx_lm(self):
+        # BFCL's OSS default of 100 threads kills the single-threaded mlx_lm
+        # server (observed live); the adapter must pass a lower --num-threads.
+        argv = runner.build_generate_argv("k", ("multi_turn_base",))
+        i = argv.index("--num-threads")
+        self.assertEqual(argv[i + 1], str(runner.DEFAULT_NUM_THREADS))
+        self.assertLessEqual(int(argv[i + 1]), 8)
+        custom = runner.build_generate_argv("k", ("multi_turn_base",),
+                                            num_threads=4)
+        self.assertEqual(custom[custom.index("--num-threads") + 1], "4")
+
     def test_evaluate_argv(self):
         argv = runner.build_evaluate_argv(
             "k", ("multi_turn_base",), result_dir="/r", score_dir="/s"

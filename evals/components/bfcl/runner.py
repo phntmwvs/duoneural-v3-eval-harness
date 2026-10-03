@@ -49,16 +49,26 @@ COMPONENT = "bfcl"
 #: never produced a terminal answer — the thrash signal. Flag, not abort.
 THRASH_TURN_CAP = 20
 
+#: Max concurrent inference threads handed to ``bfcl generate``. BFCL defaults
+#: OSS models to 100 (``LOCAL_SERVER_MAX_CONCURRENT_REQUEST``), which a
+#: single-threaded ``mlx_lm server`` cannot absorb: under a 200-conversation
+#: multi-turn load its generation thread died ("404 generation thread died",
+#: observed live on the MBP). Cap well below that for this backend.
+DEFAULT_NUM_THREADS = 8
+
 
 def build_generate_argv(model_key: str, categories, *,
-                        allow_overwrite=False, result_dir=None):
+                        allow_overwrite=False, result_dir=None,
+                        num_threads=DEFAULT_NUM_THREADS):
     """Argv (after ``bfcl``) for one ``bfcl generate`` invocation.
 
     ``categories`` is comma-joined (BFCL's ``handle_multiple_input`` splits on
     commas). ``--skip-server-setup`` keeps BFCL from spawning its own server —
     the shared ``ServerManager`` owns it. ``--allow-overwrite`` regenerates all
     ids (fresh run); omitting it lets BFCL's native per-id resume regenerate
-    only missing ids (ticket #6, decision 7a).
+    only missing ids (ticket #6, decision 7a). ``--num-threads`` caps
+    concurrency for the single-threaded ``mlx_lm server`` backend (see
+    ``DEFAULT_NUM_THREADS``).
     """
     argv = [
         "generate",
@@ -66,6 +76,7 @@ def build_generate_argv(model_key: str, categories, *,
         "--test-category", ",".join(categories),
         "--skip-server-setup",
         "--include-input-log",
+        "--num-threads", str(num_threads),
     ]
     if allow_overwrite:
         argv.append("--allow-overwrite")
@@ -144,7 +155,7 @@ def run_bfcl_cli(argv, *, project_root):
 
 def run(checkpoint: str, *, base_url, model_name=None, resume=False,
         categories=normalize.MULTI_TURN_CATEGORIES,
-        run_root=None, results_dir=None):
+        run_root=None, results_dir=None, num_threads=DEFAULT_NUM_THREADS):
     """Run the BFCL component and write the normalized result JSON.
 
     ``checkpoint`` is the checkpoint ref (local dir or HF id); ``base_url`` is
@@ -189,6 +200,7 @@ def run(checkpoint: str, *, base_url, model_name=None, resume=False,
             categories,
             allow_overwrite=not resume,
             result_dir=result_root,
+            num_threads=num_threads,
         ),
         project_root=run_root,
     )

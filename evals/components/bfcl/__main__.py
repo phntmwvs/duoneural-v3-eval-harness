@@ -46,6 +46,10 @@ def main(argv=None) -> int:
                         "(BFCL native per-id resume; ticket #6, decision 7a)")
     p.add_argument("--categories", default=",".join(normalize.MULTI_TURN_CATEGORIES),
                    help="comma-separated BFCL categories (default: the 4 multi-turn)")
+    p.add_argument("--num-threads", type=int, default=runner.DEFAULT_NUM_THREADS,
+                   help="concurrent inference threads for bfcl generate "
+                        "(default %(default)s; BFCL's own default is 100, which "
+                        "kills the single-threaded mlx_lm server)")
     args = p.parse_args(argv)
 
     categories = [c.strip() for c in args.categories.split(",") if c.strip()]
@@ -55,6 +59,7 @@ def main(argv=None) -> int:
         model_name=args.model_name,
         resume=args.resume,
         categories=tuple(categories),
+        num_threads=args.num_threads,
     )
     path = results_mod.result_path(
         os.path.join(_REPO_ROOT, "evals", "results"),
