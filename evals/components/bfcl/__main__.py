@@ -48,8 +48,8 @@ def main(argv=None) -> int:
                    help="comma-separated BFCL categories (default: the 4 multi-turn)")
     p.add_argument("--num-threads", type=int, default=runner.DEFAULT_NUM_THREADS,
                    help="concurrent inference threads for bfcl generate "
-                        "(default %(default)s; BFCL's own default is 100, which "
-                        "kills the single-threaded mlx_lm server)")
+                        "(default %(default)s = serial; BFCL's own default is "
+                        "100, which the single-threaded mlx_lm server cannot absorb)")
     args = p.parse_args(argv)
 
     categories = [c.strip() for c in args.categories.split(",") if c.strip()]

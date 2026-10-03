@@ -50,11 +50,13 @@ COMPONENT = "bfcl"
 THRASH_TURN_CAP = 20
 
 #: Max concurrent inference threads handed to ``bfcl generate``. BFCL defaults
-#: OSS models to 100 (``LOCAL_SERVER_MAX_CONCURRENT_REQUEST``), which a
-#: single-threaded ``mlx_lm server`` cannot absorb: under a 200-conversation
-#: multi-turn load its generation thread died ("404 generation thread died",
-#: observed live on the MBP). Cap well below that for this backend.
-DEFAULT_NUM_THREADS = 8
+#: OSS models to 100 (``LOCAL_SERVER_MAX_CONCURRENT_REQUEST``). The
+#: ``mlx_lm server`` is single-threaded: observed live on the MBP, 100 threads
+#: killed its generation thread outright ("404 generation thread died"), and
+#: even 8 concurrent multi-turn prompt-processing jobs (each ~6k tokens)
+#: connection-reset most requests. Serial generation is the reliable setting
+#: for this backend.
+DEFAULT_NUM_THREADS = 1
 
 
 def build_generate_argv(model_key: str, categories, *,

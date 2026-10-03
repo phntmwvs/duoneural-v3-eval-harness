@@ -74,11 +74,11 @@ class ArgvBuilderTest(unittest.TestCase):
 
     def test_generate_argv_caps_threads_for_mlx_lm(self):
         # BFCL's OSS default of 100 threads kills the single-threaded mlx_lm
-        # server (observed live); the adapter must pass a lower --num-threads.
+        # server (observed live); the adapter defaults to serial generation.
         argv = runner.build_generate_argv("k", ("multi_turn_base",))
         i = argv.index("--num-threads")
         self.assertEqual(argv[i + 1], str(runner.DEFAULT_NUM_THREADS))
-        self.assertLessEqual(int(argv[i + 1]), 8)
+        self.assertEqual(runner.DEFAULT_NUM_THREADS, 1)
         custom = runner.build_generate_argv("k", ("multi_turn_base",),
                                             num_threads=4)
         self.assertEqual(custom[custom.index("--num-threads") + 1], "4")
