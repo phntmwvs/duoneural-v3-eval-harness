@@ -54,19 +54,54 @@ def _load_json(path):
         return json.load(fh)
 
 
+def _load_json_or_jsonl(path):
+    """Load a file that is either a single JSON document or JSONL.
+
+    BFCL writes score files as JSONL: the header (accuracy) record first, then
+    one per-entry record per line (``write_list_of_dicts_to_file``). Result
+    files, by contrast, are a single JSON object. Handle both so the score
+    parser reads the real on-disk format.
+    """
+    with open(path, "r", encoding="utf-8") as fh:
+        text = fh.read()
+    stripped = text.strip()
+    if not stripped:
+        return None
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        pass
+    # JSONL: parse each non-blank line.
+    records = []
+    for line in stripped.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            return None
+    return records if records else None
+
+
 def read_score_accuracy(score_file: str):
     """Return ``(accuracy, correct_count, total_count)`` from a BFCL score file.
 
-    The score file is a list whose element 0 is the header dict inserted by
-    ``save_eval_results``. Returns ``None`` if the file is missing or has no
-    usable header.
+    The score file is JSONL whose first record is the header dict inserted by
+    ``save_eval_results`` (``accuracy`` / ``correct_count`` / ``total_count``);
+    later records are per-entry results. Tolerates a single-JSON-document file
+    whose element 0 is the header. Returns ``None`` if missing or no usable
+    header.
     """
     if not os.path.exists(score_file):
         return None
-    data = _load_json(score_file)
-    if not isinstance(data, list) or not data:
-        return None
-    header = data[0]
+    data = _load_json_or_jsonl(score_file)
+    header = None
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        header = data[0]
+    elif isinstance(data, dict):
+        # Single JSON document that is itself the header.
+        header = data
     if not isinstance(header, dict) or "accuracy" not in header:
         return None
     accuracy = header.get("accuracy")

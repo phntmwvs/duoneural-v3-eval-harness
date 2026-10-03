@@ -18,14 +18,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from evals.components.bfcl import normalize, runner  # noqa: E402
 
 
+def _write_jsonl(path, records):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        for rec in records:
+            fh.write(json.dumps(rec) + "\n")
+
+
 def _write(path, obj):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(obj, fh)
 
 
-def _score_payload(accuracy, correct, total):
-    # Mirrors save_eval_results: header dict first, then per-entry rows.
+def _score_records(accuracy, correct, total):
+    # Mirrors save_eval_results JSONL: header record first, then per-entry rows.
     return [{"accuracy": accuracy, "correct_count": correct, "total_count": total},
             {"id": "x", "valid": True}]
 
@@ -147,15 +154,15 @@ class NormalizeTest(unittest.TestCase):
         self.result_root = os.path.join(self.tmp.name, "result")
         self.score_root = os.path.join(self.tmp.name, "score")
 
-    def _score_file(self, model_key, category, payload):
+    def _score_file(self, model_key, category, records):
         path = os.path.join(self.score_root, model_key, "multi_turn",
                             normalize.score_filename(category))
-        _write(path, payload)
+        _write_jsonl(path, records)  # score files are JSONL on disk
         return path
 
     def test_read_score_accuracy(self):
         path = self._score_file("k", "multi_turn_base",
-                                _score_payload(0.75, 3, 4))
+                                _score_records(0.75, 3, 4))
         self.assertEqual(normalize.read_score_accuracy(path), (0.75, 3, 4))
 
     def test_read_score_accuracy_missing(self):
@@ -177,8 +184,8 @@ class NormalizeTest(unittest.TestCase):
 
     def test_normalize_unweighted_mean_and_missing(self):
         # Two of four categories scored.
-        self._score_file("k", "multi_turn_base", _score_payload(0.5, 5, 10))
-        self._score_file("k", "multi_turn_miss_func", _score_payload(1.0, 8, 8))
+        self._score_file("k", "multi_turn_base", _score_records(0.5, 5, 10))
+        self._score_file("k", "multi_turn_miss_func", _score_records(1.0, 8, 8))
         score, per_cat, missing = normalize.normalize(
             self.result_root, self.score_root, "k"
         )
@@ -219,7 +226,7 @@ class RunPipelineTest(unittest.TestCase):
                     path = os.path.join(score_root, "duoneural-v3-mlx-fc",
                                         "multi_turn",
                                         normalize.score_filename(cat))
-                    _write(path, _score_payload(0.8, 4, 5))
+                    _write_jsonl(path, _score_records(0.8, 4, 5))
             if op == "generate":
                 # Simulate bfcl generate writing one conversation's result.
                 path = os.path.join(result_root, "duoneural-v3-mlx-fc",
