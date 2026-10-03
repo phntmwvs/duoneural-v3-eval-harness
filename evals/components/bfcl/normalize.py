@@ -138,12 +138,14 @@ def _iter_result_entries(result_obj):
 
 
 def count_turns_per_id(result_file: str):
-    """Return ``{test_id: n_turns}`` from a BFCL multi-turn result file.
+    """Return ``{test_id: {"turns": n, "max_steps": m, "steps_per_turn": [...]}}``.
 
-    ``n_turns`` is the length of the record's per-turn ``result`` list (one
-    inner list per conversational turn). Returns an empty dict for a missing
-    or unreadable file so the thrash guard degrades to "no data" rather than
-    crashing the component.
+    A BFCL multi-turn record's ``result`` field is a per-turn list; each turn
+    is itself a list of generation steps (the model acts, a tool responds, the
+    model acts again). The thrash signal is a turn that hits BFCL's step cap
+    (the model never produced a terminal answer within the turn) — so we
+    record both the turn count and the per-turn step counts. Returns an empty
+    dict for a missing or unreadable file so the guard degrades to "no data".
     """
     if not os.path.exists(result_file):
         return {}
@@ -156,8 +158,14 @@ def count_turns_per_id(result_file: str):
         if test_id is None or not isinstance(record, dict):
             continue
         turns = record.get("result")
-        if isinstance(turns, list):
-            counts[str(test_id)] = len(turns)
+        if not isinstance(turns, list):
+            continue
+        steps = [len(t) if isinstance(t, list) else 1 for t in turns]
+        counts[str(test_id)] = {
+            "turns": len(turns),
+            "steps_per_turn": steps,
+            "max_steps": max(steps) if steps else 0,
+        }
     return counts
 
 

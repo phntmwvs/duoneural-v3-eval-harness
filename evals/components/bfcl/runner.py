@@ -98,20 +98,25 @@ def build_evaluate_argv(model_key: str, categories, *, result_dir=None,
 
 
 def compute_thrash(turn_counts, cap=THRASH_TURN_CAP):
-    """Summarize per-id turn counts into the thrash-guard subscore.
+    """Summarize per-id step counts into the thrash-guard subscore.
 
-    Returns ``{"flag": bool, "max_turns_observed": int, "cap": int,
-    "cap_hit_ids": [...], "turn_counts": {id: n}}``. ``flag`` is True when any
-    conversation reached ``cap`` turns (never produced a terminal answer).
+    ``turn_counts`` maps id -> ``{"turns", "max_steps", "steps_per_turn"}``
+    (from ``normalize.count_turns_per_id``). A conversation thrashes when any
+    of its turns reaches ``cap`` steps — BFCL force-quits a turn after 20
+    steps, so ``max_steps > cap`` (21 = 20 attempts + the forced terminal
+    message) means the model never answered within that turn. Returns
+    ``{"flag", "max_steps_observed", "cap", "cap_hit_ids", "step_counts"}``.
     """
-    counts = {str(k): int(v) for k, v in (turn_counts or {}).items()}
-    cap_hits = sorted([tid for tid, n in counts.items() if n >= cap])
+    counts = turn_counts or {}
+    max_steps = {tid: int(rec.get("max_steps", 0))
+                 for tid, rec in counts.items() if isinstance(rec, dict)}
+    cap_hits = sorted([tid for tid, m in max_steps.items() if m > cap])
     return {
         "flag": bool(cap_hits),
-        "max_turns_observed": max(counts.values()) if counts else 0,
+        "max_steps_observed": max(max_steps.values()) if max_steps else 0,
         "cap": int(cap),
         "cap_hit_ids": cap_hits,
-        "turn_counts": counts,
+        "step_counts": {tid: rec for tid, rec in counts.items()},
     }
 
 

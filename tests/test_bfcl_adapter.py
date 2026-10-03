@@ -38,10 +38,12 @@ def _score_records(accuracy, correct, total):
 
 
 def _result_payload(turns_by_id):
-    # One record per id, keyed by id, with a per-turn "result" list.
+    # One record per id, keyed by id. Each value maps id -> a list of step
+    # counts, one per turn (mirrors BFCL: result[turn] is a list of steps).
     return {
-        tid: {"id": tid, "result": [[{"name": "f"}] for _ in range(n)]}
-        for tid, n in turns_by_id.items()
+        tid: {"id": tid,
+              "result": [[{"name": "f"}] * steps for steps in steps_per_turn]}
+        for tid, steps_per_turn in turns_by_id.items()
     }
 
 
@@ -82,23 +84,32 @@ class ArgvBuilderTest(unittest.TestCase):
 
 
 class ThrashGuardTest(unittest.TestCase):
+    @staticmethod
+    def _rec(max_steps, turns=1):
+        return {"turns": turns, "steps_per_turn": [max_steps],
+                "max_steps": max_steps}
+
     def test_no_counts(self):
         t = runner.compute_thrash({})
         self.assertFalse(t["flag"])
-        self.assertEqual(t["max_turns_observed"], 0)
+        self.assertEqual(t["max_steps_observed"], 0)
         self.assertEqual(t["cap_hit_ids"], [])
 
     def test_below_cap_no_flag(self):
-        t = runner.compute_thrash({"a": 3, "b": 5}, cap=20)
+        t = runner.compute_thrash(
+            {"a": self._rec(3), "b": self._rec(20)}, cap=20)
         self.assertFalse(t["flag"])
-        self.assertEqual(t["max_turns_observed"], 5)
+        self.assertEqual(t["max_steps_observed"], 20)
         self.assertEqual(t["cap_hit_ids"], [])
 
-    def test_at_cap_flags(self):
-        t = runner.compute_thrash({"ok": 4, "thrashy": 20}, cap=20)
+    def test_over_cap_flags(self):
+        # BFCL force-quits a turn after 20 steps; 21 = 20 attempts + the
+        # forced terminal message => the model never answered in that turn.
+        t = runner.compute_thrash(
+            {"ok": self._rec(4), "thrashy": self._rec(21, turns=3)}, cap=20)
         self.assertTrue(t["flag"])
         self.assertEqual(t["cap_hit_ids"], ["thrashy"])
-        self.assertEqual(t["turn_counts"]["thrashy"], 20)
+        self.assertEqual(t["step_counts"]["thrashy"]["max_steps"], 21)
 
 
 class ResumePlannerTest(unittest.TestCase):
@@ -120,13 +131,13 @@ class ResumePlannerTest(unittest.TestCase):
 
     def test_skip_when_complete_no_id_list(self):
         self._result_file("k", "multi_turn_base",
-                          _result_payload({"multi_turn_base_0": 4}))
+                          _result_payload({"multi_turn_base_0": [4]}))
         plan = runner.ids_to_run(self.result_root, "k", ("multi_turn_base",))
         self.assertEqual(plan["multi_turn_base"], [])  # done -> skip
 
     def test_partial_with_id_list(self):
         self._result_file("k", "multi_turn_base",
-                          _result_payload({"multi_turn_base_0": 4}))
+                          _result_payload({"multi_turn_base_0": [4]}))
         requested = {"multi_turn_base": ["multi_turn_base_0", "multi_turn_base_1"]}
         plan = runner.ids_to_run(self.result_root, "k", ("multi_turn_base",),
                                  requested_ids=requested)
@@ -172,8 +183,13 @@ class NormalizeTest(unittest.TestCase):
     def test_count_turns_per_id(self):
         path = os.path.join(self.result_root, "k", "multi_turn",
                             normalize.result_filename("multi_turn_base"))
-        _write(path, _result_payload({"a": 2, "b": 5}))
-        self.assertEqual(normalize.count_turns_per_id(path), {"a": 2, "b": 5})
+        # a: 2 turns of 3 and 5 steps; b: 1 turn of 4 steps.
+        _write(path, _result_payload({"a": [3, 5], "b": [4]}))
+        counts = normalize.count_turns_per_id(path)
+        self.assertEqual(counts["a"]["turns"], 2)
+        self.assertEqual(counts["a"]["steps_per_turn"], [3, 5])
+        self.assertEqual(counts["a"]["max_steps"], 5)
+        self.assertEqual(counts["b"]["max_steps"], 4)
 
     def test_completed_ids_requires_nonempty_turns(self):
         path = os.path.join(self.result_root, "k", "multi_turn",
@@ -232,7 +248,7 @@ class RunPipelineTest(unittest.TestCase):
                 path = os.path.join(result_root, "duoneural-v3-mlx-fc",
                                     "multi_turn",
                                     normalize.result_filename("multi_turn_base"))
-                _write(path, _result_payload({"multi_turn_base_0": 3}))
+                _write(path, _result_payload({"multi_turn_base_0": [3, 3, 3]}))
 
         return fake_cli, calls
 
@@ -267,7 +283,8 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual(result["subscores"]["missing_categories"], [])
         self.assertFalse(result["subscores"]["thrash"]["flag"])
         self.assertEqual(
-            result["subscores"]["thrash"]["turn_counts"].get("multi_turn_base_0"), 3
+            result["subscores"]["thrash"]["step_counts"]
+                  ["multi_turn_base_0"]["max_steps"], 3
         )
         # Result file written + schema-valid.
         out = os.path.join(self.results_dir, "bfcl-fakerow.json")
