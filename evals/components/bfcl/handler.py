@@ -110,8 +110,22 @@ class DuoNeuralV3FCHandler(QwenFCHandler):
                 try:
                     resp = requests.get("{0}/models".format(self.base_url), timeout=10)
                     resp.raise_for_status()  # fail fast on non-200 (M3)
-                    self._resolved_server_model = resp.json()["data"][0]["id"]
-                    break
+                    data = resp.json().get("data") or []
+                    if data and data[0].get("id"):
+                        self._resolved_server_model = data[0]["id"]
+                        break
+                    # Empty /v1/models: mlx_lm serves the model but does not
+                    # list it when the model ref is an HF id (it does populate
+                    # the list for a local-dir path). In that case the served id
+                    # IS the checkpoint ref, which run() hands us via
+                    # REMOTE_OPENAI_TOKENIZER_PATH (verified live: sending the HF
+                    # id completes; sending the registry key 404s).
+                    import os
+                    ckpt = os.environ.get("REMOTE_OPENAI_TOKENIZER_PATH")
+                    if ckpt:
+                        self._resolved_server_model = ckpt
+                        break
+                    last_err = "empty /v1/models and no REMOTE_OPENAI_TOKENIZER_PATH"
                 except Exception as e:  # connection reset / not-ready / parse
                     last_err = e
                     time.sleep(1.0)
