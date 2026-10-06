@@ -124,6 +124,23 @@ class ResolveCommandTest(unittest.TestCase):
         self.assertTrue(cmd)
         self.assertEqual(os.path.basename(cmd[-1]), "docker")
 
+    def test_docker_env_path_prepends_binary_dir(self):
+        # Docker Desktop's credsStore helper must be on PATH for a first-run
+        # pull; prepend the docker binary's own directory.
+        cmd = ["/Applications/Docker.app/Contents/Resources/bin/docker"]
+        if not os.path.isdir("/Applications/Docker.app/Contents/Resources/bin"):
+            self.skipTest("Docker Desktop bin dir not present on this host")
+        path = runner.docker_env_path(cmd)
+        self.assertTrue(
+            path.startswith("/Applications/Docker.app/Contents/Resources/bin" + os.pathsep)
+        )
+
+    def test_docker_env_path_bare_docker_is_noop(self):
+        # Bare `docker` (no directory) -> PATH unchanged.
+        self.assertEqual(
+            runner.docker_env_path(["docker"]), os.environ.get("PATH", "")
+        )
+
 
 class NormalizeParseTest(unittest.TestCase):
     def test_compute_pass_at_1_matches_evalplus(self):

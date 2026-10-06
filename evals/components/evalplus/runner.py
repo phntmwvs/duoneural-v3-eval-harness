@@ -94,6 +94,25 @@ def resolve_docker_command():
     return ["docker"]
 
 
+def docker_env_path(docker_cmd):
+    """``PATH`` prefixed with the docker binary's own directory.
+
+    Docker Desktop sets ``credsStore: desktop`` (``~/.docker/config.json``),
+    whose credential helper ``docker-credential-desktop`` lives alongside the
+    docker binary and must be on ``PATH`` for a first-run image pull; a
+    non-interactive shell ``PATH`` is minimal and omits it, so the pull fails
+    with ``exec: "docker-credential-desktop": executable file not found``.
+    Prepend the binary's directory so the pull/eval works unattended. No-op
+    when the binary is bare ``docker`` (no directory) or its dir is already on
+    ``PATH``.
+    """
+    docker_dir = os.path.dirname(docker_cmd[0])
+    path = os.environ.get("PATH", "")
+    if docker_dir and os.path.isdir(docker_dir) and docker_dir not in path.split(os.pathsep):
+        return docker_dir + os.pathsep + path
+    return path
+
+
 def build_codegen_argv(model_key, dataset, *, base_url, root, resume=False):
     """Argv (after the ``evalplus.codegen`` prefix) for one generation run.
 
@@ -163,6 +182,9 @@ def run(checkpoint, *, base_url, model_name=None, resume=False,
     model_key = DEFAULT_MODEL_KEY
     codegen_prefix = resolve_evalplus_command("evalplus.codegen")
     docker_prefix = resolve_docker_command()
+    # Docker Desktop's credsStore helper must be on PATH for a first-run image
+    # pull (see docker_env_path); do it before the docker subprocesses.
+    os.environ["PATH"] = docker_env_path(docker_prefix)
 
     # --- generate on host (chat-only backend; greedy n=1/temp=0) ------------
     for dataset in normalize.DATASETS:
