@@ -138,14 +138,23 @@ class BuildCommandTest(unittest.TestCase):
         self.assertIn("--model-name", argv)
         self.assertIn("bf16", argv)
 
+    def test_evalplus_dispatches_to_real_adapter(self):
+        # evalplus (#18) now has a real adapter, like bfcl (#17).
+        argv = run_eval.build_component_command(
+            "evalplus", "checkpoints/DuoNeural-v3-4bit", model_name="4bit"
+        )
+        self.assertEqual(argv[1:3], ["-m", "evals.components.evalplus"])
+        self.assertNotIn("--component", argv)  # real adapter, no selector flag
+        self.assertIn("--model", argv)
+        self.assertIn("--model-name", argv)
+
     def test_stub_components_still_use_selector(self):
-        # evalplus (#18) / hermes (#19) still run the scaffold stub, which
-        # takes a leading --component selector.
-        for component in ("evalplus", "hermes"):
-            argv = run_eval.build_component_command(component, "m", model_name="m")
-            self.assertEqual(argv[1:3], ["-m", "evals.components"])
-            self.assertIn("--component", argv)
-            self.assertIn(component, argv)
+        # hermes (#19) still runs the scaffold stub, which takes a leading
+        # --component selector.
+        argv = run_eval.build_component_command("hermes", "m", model_name="m")
+        self.assertEqual(argv[1:3], ["-m", "evals.components"])
+        self.assertIn("--component", argv)
+        self.assertIn("hermes", argv)
 
     def test_resume_flag_forwarded(self):
         argv = run_eval.build_component_command("bfcl", "m", model_name="m", resume=True)

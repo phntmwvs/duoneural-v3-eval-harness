@@ -44,11 +44,11 @@ COMPONENT_VENV = {
 }
 
 # Component -> the ``-m`` module its adapter entry point is dispatched to.
-# BFCL's real adapter (#17) is live; evalplus (#18) and hermes (#19) still run
-# the scaffold stub (``evals.components``) until they land.
+# BFCL (#17) and EvalPlus (#18) have real adapters; hermes (#19) still runs
+# the scaffold stub (``evals.components``) until it lands.
 COMPONENT_ENTRY = {
     "bfcl": "evals.components.bfcl",
-    "evalplus": "evals.components",
+    "evalplus": "evals.components.evalplus",
     "hermes": "evals.components",
 }
 

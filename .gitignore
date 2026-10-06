@@ -10,6 +10,7 @@ __pycache__/
 checkpoints/
 evals/results/
 evals/bfcl_runs/
+evals/evalplus_runs/
 
 # OS
 .DS_Store
