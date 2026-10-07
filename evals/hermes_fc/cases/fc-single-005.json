@@ -51,7 +51,15 @@
   ],
   "expected": {
     "calls": [
-      { "name": "run_shell_command", "arguments": { "command": "head -n 5 /var/log/syslog" } }
+      {
+        "name": "run_shell_command",
+        "arguments": { "command": "head -n 5 /var/log/syslog" },
+        "command_equivalents": [
+          "head -n 5 /var/log/syslog",
+          "head -n5 /var/log/syslog",
+          "head -5 /var/log/syslog"
+        ]
+      }
     ]
   }
 }

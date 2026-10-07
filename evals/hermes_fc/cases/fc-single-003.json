@@ -22,12 +22,12 @@
       "type": "function",
       "function": {
         "name": "extract_field",
-        "description": "Read a JSON value at the given absolute file path and return the value at the given dot-separated field path, e.g. 'users.0.email'. Returns null if the path is missing.",
+        "description": "Read a JSON value at the given absolute file path and return the value at the given JSONPath expression, e.g. \"$['users'][?(@.id==42)].email\". Returns null if no node matches.",
         "parameters": {
           "type": "object",
           "properties": {
             "path": { "type": "string", "description": "Absolute path to a JSON file on disk" },
-            "field": { "type": "string", "description": "Dot-separated field path" }
+            "field": { "type": "string", "description": "JSONPath expression (RFC 9535 syntax)" }
           },
           "required": ["path", "field"],
           "additionalProperties": false
@@ -57,7 +57,7 @@
   ],
   "expected": {
     "calls": [
-      { "name": "extract_field", "arguments": { "path": "/data/users.json", "field": "users.42.email" } }
+      { "name": "extract_field", "arguments": { "path": "/data/users.json", "field": "$['users'][?(@.id==42)].email" } }
     ]
   }
 }
