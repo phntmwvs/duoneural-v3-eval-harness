@@ -1,0 +1,63 @@
+{
+  "id": "fc-single-003",
+  "category": "single",
+  "prompt": "Parse the JSON at /data/users.json and return the email address of the user whose id field equals 42.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "parse_json",
+        "description": "Parse a JSON string and return the resulting value (object, array, or scalar). Throws on invalid JSON.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string", "description": "Raw JSON text to parse" }
+          },
+          "required": ["text"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "extract_field",
+        "description": "Read a JSON value at the given absolute file path and return the value at the given JSONPath expression, e.g. \"$['users'][?(@.id==42)].email\". Returns null if no node matches.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "Absolute path to a JSON file on disk" },
+            "field": { "type": "string", "description": "JSONPath expression (RFC 9535 syntax)" }
+          },
+          "required": ["path", "field"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "transform_json",
+        "description": "Apply a small set of named transforms (rename_field, drop_field, project) to a JSON value loaded from disk. Returns the transformed value as a JSON string.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "operation": {
+              "type": "string",
+              "enum": ["rename_field", "drop_field", "project"]
+            },
+            "args": { "type": "object", "additionalProperties": true }
+          },
+          "required": ["path", "operation", "args"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "extract_field", "arguments": { "path": "/data/users.json", "field": "$['users'][?(@.id==42)].email" } }
+    ]
+  }
+}

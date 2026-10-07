@@ -1,0 +1,21 @@
+{
+  "_doc": "Reference catalog of the 5 tool families used across the Hermes FC suite (issue #4 / issue #12). Not consumed by the scorer in v1.0 (each case file embeds its own `tools[]`). Kept here as the single source of truth for tool names + argument shapes so case authors stay consistent.",
+  "version": "0.1.0",
+  "domains": {
+    "filesystem": {
+      "tools": ["read_file", "write_file", "list_directory", "delete_file", "copy_file", "move_file"]
+    },
+    "web": {
+      "tools": ["http_get", "http_post", "web_search"]
+    },
+    "data": {
+      "tools": ["parse_json", "extract_field", "transform_json", "filter_records", "aggregate"]
+    },
+    "time": {
+      "tools": ["get_current_time", "schedule_meeting", "cancel_meeting", "list_calendar"]
+    },
+    "system": {
+      "tools": ["run_shell_command", "read_env", "list_processes"]
+    }
+  }
+}
