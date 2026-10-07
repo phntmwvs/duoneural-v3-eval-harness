@@ -6,6 +6,10 @@ The end-to-end probe is a one-shot CLI run on the M4 Pro, not a unit test.
 
 Stdlib ``unittest`` (also pytest-compatible); needs no third-party deps
 so it runs in any venv and under 3.9.
+
+Note on dialects: the v3 model emits two different ``<tool_call>`` shapes
+(``#4`` vs the v3 single-quoted dialect); the probe reports each
+separately. Tests below cover both, plus the union metric.
 """
 
 from __future__ import annotations
@@ -30,41 +34,41 @@ probe = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(probe)  # type: ignore[union-attr]  # spec is non-None after the assert above
 
 
-class TestAnalyze(unittest.TestCase):
-    """Cover the four pass/fail branches the probe will report."""
+class TestAnalyzeDialectFour(unittest.TestCase):
+    """Cases that exercise the ``#4`` dialect (JSON object inside ``)."""
 
-    def test_pass(self):
+    def test_pass_d4(self):
         content = (
-            "<thought>14:00 UTC -> NY is 4 hours behind, so 10:00 ET.</thought>"
+            "<thought>Plan the meeting.</thought>"
             '<tool_call>{"name": "schedule_meeting", "arguments": '
-            '{"title": "meeting with Bob", "attendees": ["bob@example.com"], '
-            '"date": "2026-11-04", "time": "10:00", '
-            '"timezone": "America/New_York", "duration_minutes": 30}}'
+            '{"title": "demo", "attendees": ["a@example.com"]}}'
             "</tool_call>"
         )
         r = probe.analyze(content)
         self.assertTrue(r["emitted_thought"])
-        self.assertEqual(r["thought_chars"], len("14:00 UTC -> NY is 4 hours behind, so 10:00 ET."))
         self.assertTrue(r["emitted_call"])
+        self.assertTrue(r["emitted_call_d4"])
+        self.assertFalse(r["emitted_call_v3"])
+        self.assertEqual(r["call_v3_count"], 0)
+        self.assertFalse(r["emitted_call_v3_unclosed"])
+        self.assertEqual(r["call_v3_unclosed_count"], 0)
         self.assertTrue(r["call_decodes"])
         self.assertEqual(r["call_name"], "schedule_meeting")
 
     def test_no_thought(self):
-        content = (
-            '<tool_call>{"name": "schedule_meeting", "arguments": {}}'
-            "</tool_call>"
-        )
+        content = '<tool_call>{"name": "x", "arguments": {}}</tool_call>'
         r = probe.analyze(content)
         self.assertFalse(r["emitted_thought"])
         self.assertEqual(r["thought_chars"], 0)
         self.assertTrue(r["emitted_call"])
+        self.assertTrue(r["emitted_call_d4"])
         self.assertTrue(r["call_decodes"])
 
     def test_malformed_call(self):
         content = "<thought>thinking</thought><tool_call>{not json}</tool_call>"
         r = probe.analyze(content)
         self.assertTrue(r["emitted_thought"])
-        self.assertTrue(r["emitted_call"])
+        self.assertTrue(r["emitted_call_d4"])
         self.assertFalse(r["call_decodes"])
         self.assertIsNone(r["call_name"])
 
@@ -73,13 +77,92 @@ class TestAnalyze(unittest.TestCase):
         r = probe.analyze(content)
         self.assertTrue(r["emitted_thought"])
         self.assertFalse(r["emitted_call"])
+        self.assertFalse(r["emitted_call_d4"])
+        self.assertFalse(r["emitted_call_v3"])
         self.assertFalse(r["call_decodes"])
         self.assertIsNone(r["call_name"])
 
+
+class TestAnalyzeDialectV3(unittest.TestCase):
+    """Cases that exercise the v3 dialect (single-quoted args, name= attr,
+    often truncated, often multiple per generation)."""
+
+    def test_v3_single(self):
+        # One v3-dialect call, complete with args. The probe only checks
+        # the tag was opened, not that the inner content parses (the model
+        # uses Python-repr single quotes and the adapter's parser is the
+        # one that has to handle that).
+        content = (
+            "<thought>Need to think this through.</thought>"
+            '<tool_call name="schedule_meeting" arguments='
+            "{'title': 'demo', 'attendees': ['a@example.com']}>"
+        )
+        r = probe.analyze(content)
+        self.assertTrue(r["emitted_thought"])
+        self.assertTrue(r["emitted_call"])
+        self.assertTrue(r["emitted_call_v3"])
+        self.assertEqual(r["call_v3_count"], 1)
+        # The #4 dialect is *not* matched here, so the gate metric stays 0.
+        self.assertFalse(r["emitted_call_d4"])
+        self.assertFalse(r["call_decodes"])
+
+    def test_v3_truncated(self):
+        # The v3 dialect is often truncated mid-args. The probe reports
+        # this separately as "unclosed": the model attempted a call but
+        # never closed the tag, so the gate metric correctly does not
+        # credit it. This is what the operator sees in the v3-dialect
+        # data point in PROBE_RESULTS.md.
+        content = (
+            "<thought>Truncating mid-call.</thought>"
+            '<tool_call name="schedule_meeting" arguments={"title": "de'
+        )
+        r = probe.analyze(content)
+        self.assertTrue(r["emitted_thought"])
+        self.assertTrue(r["emitted_call_v3_unclosed"])
+        self.assertEqual(r["call_v3_unclosed_count"], 1)
+        # No closed call → gate metric stays 0.
+        self.assertFalse(r["emitted_call_v3"])
+        self.assertFalse(r["call_decodes"])
+
+    def test_v3_multiple(self):
+        # The model sometimes emits two `` in one generation. Probe
+        # counts both so the aggregate shows the attempt count.
+        content = (
+            "<thought>Two-step.</thought>"
+            '<tool_call name="get_current_time" arguments={"timezone": "UTC"}>'
+            '<tool_call name="schedule_meeting" arguments={"title": "x"}>'
+        )
+        r = probe.analyze(content)
+        self.assertTrue(r["emitted_call_v3"])
+        self.assertEqual(r["call_v3_count"], 2)
+
+    def test_mixed_dialects_in_one_generation(self):
+        # Defensive: a future model revision could emit both dialects
+        # in one generation. Each metric should fire independently.
+        content = (
+            "<thought>Plan + call.</thought>"
+            '<tool_call>{"name": "a", "arguments": {}}</tool_call>'
+            '<tool_call name="b" arguments={}>'
+        )
+        r = probe.analyze(content)
+        self.assertTrue(r["emitted_call_d4"])
+        self.assertTrue(r["emitted_call_v3"])
+        self.assertEqual(r["call_v3_count"], 1)
+        self.assertTrue(r["call_decodes"])
+
+
+class TestAnalyzeEdgeCases(unittest.TestCase):
     def test_empty_content(self):
         r = probe.analyze("")
         for v in r.values():
             self.assertIn(v, (False, 0, None))
+        # Explicit assertions on the new fields so they cannot silently
+        # disappear in a future refactor.
+        self.assertFalse(r["emitted_call_d4"])
+        self.assertFalse(r["emitted_call_v3"])
+        self.assertEqual(r["call_v3_count"], 0)
+        self.assertFalse(r["emitted_call_v3_unclosed"])
+        self.assertEqual(r["call_v3_unclosed_count"], 0)
 
     def test_thought_with_newlines(self):
         # <thought> blocks span newlines (DOTALL); make sure we count them

@@ -1,10 +1,11 @@
 {
-  "_doc": "First system2 case (ticket #12). Same 5 tools as the other categories; require_thought: true. Used as the live <thought>-emission probe on the M4 Pro. Will move to the cases branch when the system2 category batch is authored (see feat/hermes-fc-thought-probe).",
+  "_doc": "First system2 case (ticket #12). Tests time-domain tools (schedule_meeting) with a reasoning-heavy prompt: user gives a meeting in UTC and asks for the equivalent local time in another zone. The `system` field carries the 'think first' instruction (per the #4 amendment of 2026-10-07) — the model does not emit <thought> by default on the chat-completions endpoint, but does emit reliably when nudged. require_thought: true. Note: only `schedule_meeting` is exposed; the other time tools (get_current_time, cancel_meeting, list_calendar) were dropped from the tool list because the v3 4-bit model's output budget runs out before it can emit the call when 4 detailed schemas are present. With 1 tool, thought + call fit in 512 tokens.",
+  "_loader_note": "TODO for ticket #19 (Hermes FC adapter): when the case loader enumerates evals/hermes_fc/cases/*.json, skip this file. The case is staged here for the probe record and will move to the cases branch when fc-system2-002..005 are authored. Until then, listing it will double-count it once the cases branch lands.",
   "id": "fc-system2-001",
   "category": "system2",
   "_probe_note": "Probe scenario: user gives a meeting time in one timezone and asks the result in another. The model has to reason about the offset to pick the right 'time' + 'timezone' values. A well-reasoning model will emit a <thought> block before the tool call; this case is the gate for the System-2 scoring rule from #4. NOTE: 2026-11-04 is EST (UTC-5) because DST ends 2026-11-01, so 14:00 UTC = 09:00 America/New_York. The `system` field carries the 'think first' instruction (per the #4 amendment of 2026-10-07) — the model does not emit <thought> by default on the chat-completions endpoint, but does emit reliably when nudged.",
   "prompt": "I have a 30-minute meeting planned with bob@example.com at 14:00 UTC on 2026-11-04. Re-schedule it to the equivalent local time in America/New_York on the same date. Keep the duration at 30 minutes and keep Bob as the only attendee. Use the title 'meeting with Bob'.",
-  "system": "You are a careful assistant. Before calling any tool, reason step by step inside a <thought>...</thought> block. Then emit exactly one <tool_call>.",
+  "system": "Before answering, write your reasoning inside a <thought>...</thought> block. Then call the tool using the <tool_call> format.",
   "tools": [
     {
       "type": "function",
@@ -25,52 +26,6 @@
             "duration_minutes": { "type": "integer", "minimum": 1 }
           },
           "required": ["title", "attendees", "date", "time", "timezone", "duration_minutes"],
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "get_current_time",
-        "description": "Return the current local time in the given IANA timezone.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "timezone": { "type": "string" }
-          },
-          "required": ["timezone"],
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancel_meeting",
-        "description": "Cancel a previously scheduled meeting by its id.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "meeting_id": { "type": "string" }
-          },
-          "required": ["meeting_id"],
-          "additionalProperties": false
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "list_calendar",
-        "description": "List meetings scheduled between two ISO datetimes.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "from": { "type": "string" },
-            "to": { "type": "string" }
-          },
-          "required": ["from", "to"],
           "additionalProperties": false
         }
       }

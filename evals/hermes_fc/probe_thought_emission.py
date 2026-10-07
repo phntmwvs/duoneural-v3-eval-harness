@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import socket
 import sys
 import time
 import urllib.error
@@ -48,6 +49,12 @@ import urllib.request
 # Reuse the shared serve lifecycle (ticket #16) so the probe matches the
 # production path exactly.
 _REPO_ROOT = __file__.rsplit("/evals/", 1)[0]
+if not _REPO_ROOT:
+    sys.exit(
+        "probe_thought_emission.py: could not resolve repo root from "
+        f"__file__={__file__!r}. Run from the repo root or pass an absolute "
+        "path to --case."
+    )
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 from evals.server import ServerManager  # noqa: E402
@@ -62,10 +69,33 @@ DEFAULT_MODEL_KEY = "default_model"
 # <thought> per bfcl/handler.py:_THOUGHT_RE — no whitespace variants, no other
 # dialects (Qwen uses <think>, base uses different tags — neither applies here).
 _THOUGHT_RE = re.compile(r"<thought>(.*?)</thought>", re.DOTALL)
-# The actual <tool_call>{json}</tool_call> artifact. The Unicode U+200B is in
-# the spec text (zero-width space) — the model emits a regular <tool_call> in
-# practice, but we keep the match tolerant.
+
+# Two tool-call dialects the v3 model produces. The probe reports each
+# independently so the gate decision is dialect-aware.
+#
+# 1) #4 dialect — what the #4 design ticket specified:
+#       <tool_call>{"name": "...", "arguments": {...}}</tool_call>
 _TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
+#
+# 2) v3 dialect — what the v3 model emits under a 'think first' system
+#    message (observed live on DuoNeural-v3-4bit, see
+#    evals/hermes_fc/PROBE_RESULTS.md):
+#       <tool_call name="..." arguments='{...}'>   (single-quoted args,
+#                                                    often truncated, often
+#                                                    multiple per generation)
+#    We capture the prefix (everything up to the first '>') so the report
+#    can show how many call attempts the model made and how many completed.
+_TOOL_CALL_V3_RE = re.compile(r"<tool_call\s+([^>]*?)\s*/?>", re.DOTALL)
+# Unclosed v3-dialect tags (the model truncates mid-args and never emits
+# the closing '>'). The "attempted" count surfaces these so the operator
+# can see the model was *trying* to call a tool, even though the gate
+# metric correctly does not credit an incomplete call.
+_TOOL_CALL_V3_UNCLOSED_RE = re.compile(r"<tool_call\s+[^>]*$", re.DOTALL)
+# Match either dialect to decide "emitted any tool call" in the row's main
+# metric. The two specific regexes above give the dialect breakdown.
+_TOOL_CALL_ANY_RE = re.compile(
+    r"<tool_call>|<tool_call\s+[^>]*?>", re.DOTALL
+)
 
 # One-line description for ``argparse`` (avoids relying on ``__doc__`` being
 # non-None at the point of parser construction).
@@ -95,23 +125,38 @@ def post_chat(base_url: str, payload: dict, timeout_s: float = 120.0) -> dict:
 
 
 def analyze(content: str) -> dict:
-    """One row of the report: did the model think first, and did the call parse?"""
+    """One row of the report: did the model think first, and did the call parse?
+
+    Reports the #4 dialect and the v3 dialect separately, plus the union.
+    For the v3 dialect we cannot use ``json.loads`` on the inner content
+    (the model uses Python-repr-style single quotes and frequently
+    truncates mid-call); we only check that at least one v3-dialect call
+    tag was opened.
+    """
     thought_match = _THOUGHT_RE.search(content)
-    call_match = _TOOL_CALL_RE.search(content)
-    call_json = None
-    call_decodes = False
-    if call_match is not None:
+    call4_match = _TOOL_CALL_RE.search(content)
+    call4_json = None
+    call4_decodes = False
+    if call4_match is not None:
         try:
-            call_json = json.loads(call_match.group(1))
-            call_decodes = True
+            call4_json = json.loads(call4_match.group(1))
+            call4_decodes = True
         except (ValueError, TypeError):
             pass
+    call_v3_matches = list(_TOOL_CALL_V3_RE.finditer(content))
+    call_v3_unclosed = list(_TOOL_CALL_V3_UNCLOSED_RE.finditer(content))
+    any_call = bool(_TOOL_CALL_ANY_RE.search(content)) or bool(call_v3_unclosed)
     return {
         "emitted_thought": thought_match is not None,
         "thought_chars": len(thought_match.group(1)) if thought_match else 0,
-        "emitted_call": call_match is not None,
-        "call_decodes": call_decodes,
-        "call_name": (call_json or {}).get("name") if isinstance(call_json, dict) else None,
+        "emitted_call": any_call,
+        "emitted_call_d4": call4_match is not None,
+        "call_decodes": call4_decodes,
+        "call_name": (call4_json or {}).get("name") if isinstance(call4_json, dict) else None,
+        "emitted_call_v3": len(call_v3_matches) > 0,
+        "call_v3_count": len(call_v3_matches),
+        "emitted_call_v3_unclosed": len(call_v3_unclosed) > 0,
+        "call_v3_unclosed_count": len(call_v3_unclosed),
     }
 
 
@@ -142,7 +187,9 @@ def main() -> int:
     p.add_argument("--host", default="127.0.0.1", help="Bind host (default 127.0.0.1).")
     p.add_argument("--startup-timeout-s", type=float, default=300.0)
     p.add_argument("--min-pass-rate", type=float, default=1.0,
-                   help="Pass rate to consider the gate cleared (default 1.0 = 10/10).")
+                   help=("Pass rate to consider the gate cleared (0.0-1.0, "
+                         "default 1.0 = all generations must pass). "
+                         "Independent of --n."))
     p.add_argument("--log-file", default=None,
                    help="Optional path to capture server stdout/stderr.")
     args = p.parse_args()
@@ -173,7 +220,8 @@ def main() -> int:
             payload = build_payload(case, DEFAULT_MODEL_KEY)
             try:
                 resp = post_chat(base_url, payload)
-            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
+            except (urllib.error.URLError, urllib.error.HTTPError,
+                    TimeoutError, socket.timeout) as exc:
                 results.append({"i": i, "error": repr(exc)})
                 print(f"[{i+1:>2}/{args.n}] ERROR ({type(exc).__name__}): {exc}", file=sys.stderr)
                 continue
@@ -191,10 +239,16 @@ def main() -> int:
             row = analyze(content)
             row.update({"i": i, "elapsed_s": round(elapsed, 2), "content": content})
             results.append(row)
-            tag = "PASS" if (row["emitted_thought"] and row["emitted_call"] and row["call_decodes"]) else "FAIL"
+            # Gate condition: thought + a parseable call. We require the
+            # #4 dialect because that's what the adapter (ticket #19) is
+            # currently specified against; the v3 dialect is reported as
+            # an extra metric but does not, by itself, satisfy the gate.
+            tag = "PASS" if (row["emitted_thought"] and row["call_decodes"]) else "FAIL"
             print(f"[{i+1:>2}/{args.n}] {tag}  thought={row['emitted_thought']!s:<5} "
                   f"thought_chars={row['thought_chars']:>4}  "
-                  f"call={row['emitted_call']!s:<5}  call_decodes={row['call_decodes']!s:<5}  "
+                  f"call(d4)={row['emitted_call_d4']!s:<5}  call(d4_decodes)={row['call_decodes']!s:<5}  "
+                  f"call(v3)={row['emitted_call_v3']!s:<5} v3_n={row['call_v3_count']}  "
+                  f"call(v3_un)={row['emitted_call_v3_unclosed']!s:<5} v3_un_n={row['call_v3_unclosed_count']}  "
                   f"name={row['call_name']!r}  t={row['elapsed_s']}s", file=sys.stderr)
 
     finally:
@@ -205,24 +259,30 @@ def main() -> int:
     # Aggregate.
     n_total = len(results)
     n_thought = sum(1 for r in results if r.get("emitted_thought"))
-    n_call = sum(1 for r in results if r.get("emitted_call"))
+    n_call_d4 = sum(1 for r in results if r.get("emitted_call_d4"))
+    n_call_v3 = sum(1 for r in results if r.get("emitted_call_v3"))
+    n_call_v3_unclosed = sum(1 for r in results if r.get("emitted_call_v3_unclosed"))
+    n_call_any = sum(1 for r in results if r.get("emitted_call"))
     n_decodes = sum(1 for r in results if r.get("call_decodes"))
     n_clean = sum(1 for r in results
-                  if r.get("emitted_thought") and r.get("emitted_call") and r.get("call_decodes"))
+                  if r.get("emitted_thought") and r.get("call_decodes"))
     n_err = sum(1 for r in results if r.get("error"))
     pass_rate = (n_clean / n_total) if n_total else 0.0
 
     print()
-    print("=" * 64)
+    print("=" * 72)
     print(f"PROBE REPORT — {args.checkpoint} × {args.n} generations on {args.case}")
-    print("=" * 64)
-    print(f"  emitted <thought>  : {n_thought}/{n_total}  ({n_thought / max(n_total, 1):.0%})")
-    print(f"  emitted <tool_call> : {n_call}/{n_total}  ({n_call / max(n_total, 1):.0%})")
-    print(f"  call JSON parses   : {n_decodes}/{n_total}  ({n_decodes / max(n_total, 1):.0%})")
-    print(f"  full pass          : {n_clean}/{n_total}  ({pass_rate:.0%})")
-    print(f"  errors             : {n_err}/{n_total}")
-    print(f"  gate threshold     : {args.min_pass_rate:.0%}")
-    print("=" * 64)
+    print("=" * 72)
+    print(f"  emitted <thought>             : {n_thought}/{n_total}  ({n_thought / max(n_total, 1):.0%})")
+    print(f"  emitted <tool_call> (#4)      : {n_call_d4}/{n_total}  ({n_call_d4 / max(n_total, 1):.0%})")
+    print(f"  emitted <tool_call> (v3, closed)    : {n_call_v3}/{n_total}  ({n_call_v3 / max(n_total, 1):.0%})")
+    print(f"  emitted <tool_call> (v3, unclosed)  : {n_call_v3_unclosed}/{n_total}  ({n_call_v3_unclosed / max(n_total, 1):.0%})")
+    print(f"  emitted any call (union)      : {n_call_any}/{n_total}  ({n_call_any / max(n_total, 1):.0%})")
+    print(f"  call JSON parses (#4 dialect) : {n_decodes}/{n_total}  ({n_decodes / max(n_total, 1):.0%})")
+    print(f"  full pass (thought + #4 dec.) : {n_clean}/{n_total}  ({pass_rate:.0%})")
+    print(f"  errors                        : {n_err}/{n_total}")
+    print(f"  gate threshold                : {args.min_pass_rate:.0%}")
+    print("=" * 72)
     if n_total == 0:
         print("GATE: no generations completed (all errored); see stderr.", file=sys.stderr)
         return 2
