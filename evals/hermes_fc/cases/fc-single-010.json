@@ -1,0 +1,57 @@
+{
+  "id": "fc-single-010",
+  "category": "single",
+  "prompt": "Look up the value of the PATH environment variable and tell me what it is.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "read_env",
+        "description": "Read the value of a single environment variable. If `name` is omitted, returns a JSON object of {name: value} for every env var. Sensitive variables (anything containing 'SECRET', 'TOKEN', 'KEY', or 'PASSWORD' in the name) are redacted to '<redacted>' for safety.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "run_shell_command",
+        "description": "Execute a shell command in a sandboxed non-interactive shell and return its combined stdout+stderr.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "command": { "type": "string" },
+            "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 60 },
+            "confirm": { "type": "boolean" }
+          },
+          "required": ["command"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_processes",
+        "description": "Return a snapshot of running processes as a JSON array of {pid, user, command}.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "filter_user": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "read_env", "arguments": { "name": "PATH" } }
+    ]
+  }
+}

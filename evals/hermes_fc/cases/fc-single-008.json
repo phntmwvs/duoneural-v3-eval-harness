@@ -1,0 +1,70 @@
+{
+  "id": "fc-single-008",
+  "category": "single",
+  "prompt": "The file /data/customers.json holds a list of customer records. Drop the 'ssn' field from every record and write the result back to /data/customers.redacted.json.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "transform_json",
+        "description": "Apply a small set of named transforms to a JSON value loaded from disk. Returns the transformed value as a JSON string. `operation` is one of: 'rename_field' (rename a top-level field), 'drop_field' (remove a top-level field), 'project' (keep only a whitelisted set of top-level fields).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "operation": {
+              "type": "string",
+              "enum": ["rename_field", "drop_field", "project"]
+            },
+            "args": { "type": "object", "additionalProperties": true }
+          },
+          "required": ["path", "operation", "args"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "read_file",
+        "description": "Read the full text contents of a file at the given absolute path.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "write_file",
+        "description": "Write a UTF-8 string to a file at the given absolute path, overwriting any existing contents.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "contents": { "type": "string" }
+          },
+          "required": ["path", "contents"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      {
+        "name": "transform_json",
+        "arguments": {
+          "path": "/data/customers.json",
+          "operation": "drop_field",
+          "args": { "field": "ssn" }
+        }
+      }
+    ]
+  }
+}
