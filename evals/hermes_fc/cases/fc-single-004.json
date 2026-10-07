@@ -1,0 +1,91 @@
+{
+  "id": "fc-single-004",
+  "category": "single",
+  "prompt": "Schedule a 30-minute meeting titled 'Q3 planning' with alice@example.com on 2026-11-04 at 14:00 in the Europe/London timezone.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "schedule_meeting",
+        "description": "Schedule a calendar meeting. `attendees` is a list of email addresses, `date` is YYYY-MM-DD, `time` is HH:MM in 24h, `timezone` is an IANA tz like 'Europe/London', `duration_minutes` is an integer.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "attendees": {
+              "type": "array",
+              "items": { "type": "string", "format": "email" }
+            },
+            "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+            "time": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
+            "timezone": { "type": "string" },
+            "duration_minutes": { "type": "integer", "minimum": 1 }
+          },
+          "required": ["title", "attendees", "date", "time", "timezone", "duration_minutes"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_current_time",
+        "description": "Return the current local time in the given IANA timezone.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "timezone": { "type": "string" }
+          },
+          "required": ["timezone"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancel_meeting",
+        "description": "Cancel a previously scheduled meeting by its id.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "meeting_id": { "type": "string" }
+          },
+          "required": ["meeting_id"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_calendar",
+        "description": "List meetings scheduled between two ISO datetimes.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "from": { "type": "string" },
+            "to": { "type": "string" }
+          },
+          "required": ["from", "to"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      {
+        "name": "schedule_meeting",
+        "arguments": {
+          "title": "Q3 planning",
+          "attendees": ["alice@example.com"],
+          "date": "2026-11-04",
+          "time": "14:00",
+          "timezone": "Europe/London",
+          "duration_minutes": 30
+        }
+      }
+    ]
+  }
+}
