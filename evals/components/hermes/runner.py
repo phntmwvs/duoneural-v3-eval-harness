@@ -48,6 +48,11 @@ COMPONENT = "hermes"
 #: ``mlx_lm server`` registers its loaded checkpoint under the literal key
 #: ``default_model`` (see evals/components/evalplus/runner.py:DEFAULT_MODEL_KEY
 #: for the full rationale). Sending it always selects the served checkpoint.
+#: Deliberately the canonical server key, *not* BFCL's ``/v1/models`` lookup:
+#: the latter exists because BFCL sends a registry key that ``mlx_lm`` would
+#: 404 as an HF id (``handler.py:_server_model_id``), whereas ``default_model``
+#: is mapped server-side to whatever checkpoint is loaded and also sidesteps
+#: the empty-``/v1/models`` edge case when the checkpoint ref is an HF id.
 DEFAULT_MODEL_KEY = "default_model"
 
 #: Greedy decoding, one completion — reproducible pass/fail per case.
@@ -116,10 +121,14 @@ def post_chat(base_url, payload, timeout_s=REQUEST_TIMEOUT_S):
 
     The seam tests patch: the live path talks to ``mlx_lm server``; tests
     substitute a mock that returns a canned completion.
+
+    ``base_url`` points at the server root (e.g. ``http://127.0.0.1:8080/v1``);
+    any trailing slash is stripped so a ``--base-url .../v1/`` does not
+    produce a ``.../v1//chat/completions`` double slash (404s live — M2).
     """
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        base_url + "/chat/completions",
+        base_url.rstrip("/") + "/chat/completions",
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST",

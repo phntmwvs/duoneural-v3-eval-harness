@@ -117,6 +117,48 @@ class TestExtractContent(unittest.TestCase):
             runner.extract_content({})
 
 
+class TestPostChat(unittest.TestCase):
+    """M2 — the chat-completions URL is built from ``base_url`` with double
+    slashes collapsed, so a trailing-slash ``--base-url`` can't 404."""
+
+    def _captured_url(self, base_url):
+        captured = []
+
+        class _FakeResp:
+            def read(self):
+                return b'{"ok": true}'
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        def fake_urlopen(req, timeout=None):  # noqa: ARG001
+            captured.append(req.full_url)
+            return _FakeResp()
+
+        with mock.patch.object(runner.urllib.request, "urlopen",
+                               side_effect=fake_urlopen):
+            runner.post_chat(base_url, {"model": "x"})
+        return captured[0]
+
+    def test_trailing_slash_is_normalized(self):
+        self.assertEqual(
+            self._captured_url("http://127.0.0.1:8080/v1/"),
+            "http://127.0.0.1:8080/v1/chat/completions")
+
+    def test_no_trailing_slash_is_unchanged(self):
+        self.assertEqual(
+            self._captured_url("http://127.0.0.1:8080/v1"),
+            "http://127.0.0.1:8080/v1/chat/completions")
+
+    def test_multiple_trailing_slashes_collapse(self):
+        self.assertEqual(
+            self._captured_url("http://127.0.0.1:8080/v1///"),
+            "http://127.0.0.1:8080/v1/chat/completions")
+
+
 class TestRunCase(unittest.TestCase):
     def _case(self):
         return {
