@@ -1,8 +1,8 @@
 {
-  "_doc": "fc-parallel-009 (time): list_calendar + schedule_meeting; no order. The prompt says 'check if 14:00 UTC is free, and if it is, schedule...' but the test passes either order: list-then-schedule (check first) or schedule-then-list (assume free, verify after). No order dependency; tests that the model picks the right 2 time tools out of 4 (cancel_meeting, get_current_time, list_calendar, schedule_meeting).",
+  "_doc": "fc-parallel-009 (time): list_calendar + schedule_meeting; no order. Reworded per N1 (PR #31): the prompt now makes both calls explicitly required ('schedule... and list the day to verify') instead of the conditional 'if it is free, schedule', which could elicit a check-only response and fail the 2-call expectation under case-level AND. No order dependency; the test passes either order. Tests that the model picks the right 2 time tools out of 4 (cancel_meeting, get_current_time, list_calendar, schedule_meeting).",
   "id": "fc-parallel-009",
   "category": "parallel",
-  "prompt": "Check the calendar for 2026-12-01 to see if 14:00 UTC is free. If it is, schedule a 60-minute 'Team retro' with alice@example.com, bob@example.com, carol@example.com, and dave@example.com at that slot.",
+  "prompt": "Check the calendar for 2026-12-01 to see if 14:00 UTC is free, and schedule a 60-minute 'Team retro' with alice@example.com, bob@example.com, carol@example.com, and dave@example.com at that slot. Both actions are required: schedule the meeting and list the day's calendar to verify.",
   "tools": [
     {
       "type": "function",

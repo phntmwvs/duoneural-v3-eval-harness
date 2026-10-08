@@ -1,8 +1,8 @@
 {
-  "_doc": "fc-parallel-006 (filesystem): list + 2x delete; depends_on_order: true. The prompt names the specific files to delete but instructs the model to list first; the expected calls are list_directory then 2x delete_file in that exact order. Order matters because the prompt's 'first... then' phrasing makes the list step a verification, not a discoverable step (the files are named). Tests that the model can do 3 calls in the right order, not just 1 or 2.",
+  "_doc": "fc-parallel-006 (filesystem): list + 2x delete; depends_on_order: true. The prompt names the specific files to delete but instructs the model to list first; the expected calls are list_directory then 2x delete_file in that exact order. Order matters because the prompt's 'first... then' phrasing makes the list step a verification, not a discoverable step (the files are named). Tests that the model can do 3 calls in the right order, not just 1 or 2. ORDER CONTRACT (M1, PR #31): the scorer (#19) only has two modes — order-insensitive (depends_on_order absent/false) and strict positional (true). This case needs 'list before deletes', which order-insensitive cannot express (it would wrongly pass delete-before-list), so we keep strict positional. To avoid over-constraining the two same-phase deletes, the prompt pins their literal order ('...1.0... then ...1.1...'); the model is expected to follow the prompt's listing order. A future depends_on_order: 'partial' knob in #19 would let the two deletes be mutually unordered.",
   "id": "fc-parallel-006",
   "category": "parallel",
-  "prompt": "First list the contents of /tmp/old-builds/ to see what's there. Then delete /tmp/old-builds/app-1.0.tar.gz and /tmp/old-builds/app-1.1.tar.gz.",
+  "prompt": "First list the contents of /tmp/old-builds/ to see what's there. Then delete /tmp/old-builds/app-1.0.tar.gz, then /tmp/old-builds/app-1.1.tar.gz, in that order.",
   "tools": [
     {
       "type": "function",
