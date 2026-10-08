@@ -72,16 +72,26 @@ def has_any_call_attempt(content):
 
 
 def _extract_balanced_object(text, start):
-    """Return the JSON-object substring starting at ``text[start] == '{'``.
+    """Return ``(payload, raw)`` for the JSON object starting at
+    ``text[start] == '{'``.
 
-    Walks the text tracking brace depth, skipping over string literals (so
-    a ``}`` inside a quoted value — e.g. a shell command — does not close
-    the object early). Returns ``None`` if the braces never balance (a
-    truncated generation).
+    Walks the text tracking brace depth and string state. At each closing
+    brace that returns depth to zero we try ``json.JSONDecoder().raw_decode``
+    on the substring: raw_decode handles ``\\``-escaped quotes correctly
+    (a naive string-skip treats ``\\"`` as ending the string and mis-counts
+    braces — caught in review on ``{"cmd": "echo \\"hi\\"}"}``). If the
+    balanced substring doesn't decode (the model put an unquoted ``}`` in a
+    value, or truncated), we keep scanning for the next closing brace so a
+    slightly-over-long tail can still salvage the payload.
+
+    Returns ``(dict_or_None, raw_substring)``: ``payload`` is the decoded
+    dict on success, ``None`` when the braces never balance or never
+    decode; ``raw`` is always the substring examined (for error reports).
     """
     depth = 0
     in_string = False
     escape = False
+    decoder = json.JSONDecoder()
     for i in range(start, len(text)):
         ch = text[i]
         if in_string:
@@ -99,8 +109,15 @@ def _extract_balanced_object(text, start):
         elif ch == "}":
             depth -= 1
             if depth == 0:
-                return text[start:i + 1]
-    return None
+                raw = text[start:i + 1]
+                try:
+                    payload, _ = decoder.raw_decode(raw)
+                except ValueError:
+                    continue  # over-long candidate; keep scanning for '}'
+                if isinstance(payload, dict):
+                    return payload, raw
+                return None, raw
+    return None, text[start:]
 
 
 def parse_predicted_calls(content):
@@ -121,19 +138,11 @@ def parse_predicted_calls(content):
             # Not a #4-dialect payload (e.g. a v3-style attribute tag) —
             # the ANY_CALL gate handles attempt detection; nothing to parse.
             continue
-        raw = _extract_balanced_object(content, i)
-        if raw is None:
-            calls.append({"_parse_error": True, "raw": content[i:]})
-            continue
-        try:
-            payload = json.loads(raw)
-        except (ValueError, TypeError):
+        payload, raw = _extract_balanced_object(content, i)
+        if payload is None:
             calls.append({"_parse_error": True, "raw": raw})
-            continue
-        if isinstance(payload, dict):
-            calls.append(payload)
         else:
-            calls.append({"_parse_error": True, "raw": raw})
+            calls.append(payload)
     return calls
 
 

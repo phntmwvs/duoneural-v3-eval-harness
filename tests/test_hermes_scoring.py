@@ -80,6 +80,17 @@ class TestParsePredictedCalls(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertTrue(calls[0]["_parse_error"])
 
+    def test_escaped_quotes_and_braces_in_strings(self):
+        # Regression (caught in review): the extractor must not treat an
+        # escaped quote as ending a string, nor a '}' inside a string as
+        # closing the payload.
+        import json as _json
+        payload = _json.dumps({"name": "run_shell_command",
+                               "arguments": {"command": 'echo "hi" && echo }'}})
+        calls = scoring.parse_predicted_calls(
+            "<tool_call>" + payload + "</tool_call>")
+        self.assertEqual(calls[0]["arguments"]["command"], 'echo "hi" && echo }')
+
     def test_no_calls(self):
         self.assertEqual(scoring.parse_predicted_calls("just prose."), [])
 
