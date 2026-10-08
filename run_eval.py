@@ -107,6 +107,7 @@ def run_component(
     emit_stub: bool = False,
     dry_run: bool = False,
     repo_root: str = REPO_ROOT,
+    env: dict | None = None,
 ) -> int:
     """Dispatch one component in its venv; return its exit code.
 
@@ -115,6 +116,9 @@ def run_component(
     ``model`` so callers that pass a row name as ``--model`` are unaffected,
     but an HF-id checkpoint should pass a slug-safe ``--model-name``.
     ``base_url`` is forwarded to real adapters that run against a live server.
+    ``env`` is the env passed to the subprocess (defaults to the caller's
+    ``os.environ`` plus the repo's ``PYTHONPATH``); the matrix uses it to
+    propagate ``FAKE_RESULT_PATH`` and per-row config into the adapter.
     """
     if model_name is None:
         model_name = model
@@ -140,8 +144,10 @@ def run_component(
             file=sys.stderr,
         )
         return 2
-    env = dict(os.environ, PYTHONPATH=repo_root + os.pathsep + os.environ.get("PYTHONPATH", ""))
-    proc = subprocess.run(argv, cwd=repo_root, env=env)
+    if env is None:
+        env = dict(os.environ)
+    full_env = dict(env, PYTHONPATH=repo_root + os.pathsep + env.get("PYTHONPATH", ""))
+    proc = subprocess.run(argv, cwd=repo_root, env=full_env)
     return proc.returncode
 
 
