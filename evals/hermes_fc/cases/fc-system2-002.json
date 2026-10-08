@@ -13,9 +13,14 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path to the file to read, e.g. /etc/hostname"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -23,7 +28,12 @@
   ],
   "expected": {
     "calls": [
-      { "name": "read_file", "arguments": { "path": "/etc/timezone" } }
+      {
+        "name": "read_file",
+        "arguments": {
+          "path": "/etc/timezone"
+        }
+      }
     ]
   },
   "require_thought": true

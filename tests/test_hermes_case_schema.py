@@ -30,6 +30,7 @@ import unittest
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CASES_DIR = os.path.join(_REPO_ROOT, "evals", "hermes_fc", "cases")
+TOOLS_JSON = os.path.join(_REPO_ROOT, "evals", "hermes_fc", "tools.json")
 CATEGORIES = {"single", "parallel", "negative", "system2"}
 ID_RE = re.compile(r"^fc-(single|parallel|negative|system2)-\d{3}$")
 
@@ -220,6 +221,96 @@ class TestCaseSchema(unittest.TestCase):
                 self.assertIsInstance(eqs, list, f"{fname}: call[{i}].command_equivalents must be a list")
                 for j, eq in enumerate(eqs):
                     self.assertIsInstance(eq, str, f"{fname}: call[{i}].command_equivalents[{j}] must be a string")
+
+
+class TestToolDefinitionsSSOT(unittest.TestCase):
+    """Anti-drift guard for issue #33: tools.json is the single source of
+    truth for tool definitions; every case embeds a snapshot of the
+    canonical definitions it uses, and any divergence fails here.
+
+    Three assertions:
+
+    - tools.json internal consistency: every tool named in ``domains`` has
+      a ``definitions`` entry and vice versa, and each definition's
+      ``name`` field matches its key;
+    - every embedded tool across all cases deep-equals the canonical
+      ``definitions`` entry for its name (parsed-JSON equality — a case
+      that rephrases a description, drops a property, or retypes a schema
+      fails);
+    - every embedded tool carries the OpenAI ``{"type": "function"}``
+      envelope the adapter's chat-completions payload requires.
+
+    This runs on the mini at ``python -m unittest`` time — a case author
+    who edits one embedded copy (or adds a case with a hand-typed tool)
+    gets a failure naming the case, the tool, and the differing keys,
+    rather than silent drift across the suite.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        with open(TOOLS_JSON) as fh:
+            cls.tools_doc = json.load(fh)
+        cls.defs = cls.tools_doc["definitions"]
+        cls.cases = _load_all()
+        if not cls.cases:
+            raise unittest.SkipTest(f"no cases in {CASES_DIR}")
+
+    def test_tools_json_internally_consistent(self):
+        domain_names = {
+            name
+            for domain in self.tools_doc["domains"].values()
+            for name in domain["tools"]
+        }
+        def_names = set(self.defs)
+        self.assertEqual(
+            domain_names, def_names,
+            f"domains/definitions mismatch: "
+            f"only in domains: {sorted(domain_names - def_names)}, "
+            f"only in definitions: {sorted(def_names - domain_names)}",
+        )
+        for key, defn in self.defs.items():
+            self.assertEqual(
+                defn["name"], key,
+                f"definitions[{key!r}].name is {defn['name']!r}",
+            )
+            self.assertEqual(
+                defn.get("parameters", {}).get("type"), "object",
+                f"definitions[{key!r}].parameters.type must be 'object'",
+            )
+
+    def test_embedded_tools_match_canonical_definitions(self):
+        for fname, c in self.cases:
+            for i, t in enumerate(c["tools"]):
+                name = t["function"]["name"]
+                self.assertIn(
+                    name, self.defs,
+                    f"{fname}: tool[{i}] {name!r} has no canonical "
+                    f"definition in tools.json",
+                )
+                canon = self.defs[name]
+                embedded = t["function"]
+                if embedded != canon:
+                    # Name the differing top-level keys so the failure is
+                    # actionable without a manual diff.
+                    diffs = [
+                        k for k in set(embedded) | set(canon)
+                        if embedded.get(k) != canon.get(k)
+                    ]
+                    self.fail(
+                        f"{fname}: embedded {name!r} diverges from "
+                        f"tools.json (differs in {sorted(diffs)}) — edit "
+                        f"tools.json and re-snapshot, or restore the case "
+                        f"copy; drift is not allowed (issue #33)"
+                    )
+
+    def test_embedded_tools_carry_function_envelope(self):
+        for fname, c in self.cases:
+            for i, t in enumerate(c["tools"]):
+                self.assertEqual(
+                    t.get("type"), "function",
+                    f"{fname}: tool[{i}] must be wrapped in "
+                    f"{{'type': 'function', 'function': {{...}}}}",
+                )
 
 
 class TestCategoryMix(unittest.TestCase):

@@ -12,9 +12,14 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "text": { "type": "string" }
+            "text": {
+              "type": "string",
+              "description": "Raw JSON text to parse"
+            }
           },
-          "required": ["text"],
+          "required": [
+            "text"
+          ],
           "additionalProperties": false
         }
       }
@@ -27,10 +32,19 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" },
-            "field": { "type": "string", "description": "JSONPath expression (RFC 9535 syntax)" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path to a JSON file on disk"
+            },
+            "field": {
+              "type": "string",
+              "description": "JSONPath expression (RFC 9535 syntax)"
+            }
           },
-          "required": ["path", "field"],
+          "required": [
+            "path",
+            "field"
+          ],
           "additionalProperties": false
         }
       }
@@ -43,10 +57,19 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string", "description": "Absolute path to a JSON file on disk containing a list (or {records: [...]})" },
-            "filter": { "type": "string", "description": "JSONPath predicate, e.g. \"$[?(@.in_stock==true)]\"" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path to a JSON file on disk containing a list (or {records: [...]})"
+            },
+            "filter": {
+              "type": "string",
+              "description": "JSONPath predicate, e.g. \"$[?(@.in_stock==true)]\""
+            }
           },
-          "required": ["path", "filter"],
+          "required": [
+            "path",
+            "filter"
+          ],
           "additionalProperties": false
         }
       }
@@ -55,18 +78,31 @@
       "type": "function",
       "function": {
         "name": "transform_json",
-        "description": "Apply a small set of named transforms to a JSON value loaded from disk. Returns the transformed value as a JSON string. `operation` is one of: 'rename_field' (rename a top-level field), 'drop_field' (remove a top-level field), 'project' (keep only a whitelisted set of top-level fields).",
+        "description": "Apply a small set of named transforms to a JSON value loaded from disk. Returns the transformed value as a JSON string. `operation` is one of: 'rename_field' (rename a top-level field — args: {\"from\": \"old_name\", \"to\": \"new_name\"}), 'drop_field' (remove a top-level field — args: {\"field\": \"field_name\"}), 'project' (keep only a whitelisted set of top-level fields — args: {\"fields\": [\"field_a\", \"field_b\"]}).",
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" },
+            "path": {
+              "type": "string"
+            },
             "operation": {
               "type": "string",
-              "enum": ["rename_field", "drop_field", "project"]
+              "enum": [
+                "rename_field",
+                "drop_field",
+                "project"
+              ]
             },
-            "args": { "type": "object", "additionalProperties": true }
+            "args": {
+              "type": "object",
+              "additionalProperties": true
+            }
           },
-          "required": ["path", "operation", "args"],
+          "required": [
+            "path",
+            "operation",
+            "args"
+          ],
           "additionalProperties": false
         }
       }

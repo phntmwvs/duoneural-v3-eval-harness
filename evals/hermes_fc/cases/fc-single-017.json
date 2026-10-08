@@ -8,13 +8,25 @@
       "type": "function",
       "function": {
         "name": "http_get",
-        "description": "Issue an HTTP GET request to the given absolute URL. Returns the response body as a string.",
+        "description": "Issue an HTTP GET request to the given absolute URL and return the response body as a string. The optional `headers` field is a JSON object of header name to value. Follows up to 5 redirects.",
         "parameters": {
           "type": "object",
           "properties": {
-            "url": { "type": "string" }
+            "url": {
+              "type": "string",
+              "description": "Absolute URL to GET, e.g. https://example.com/api/readme"
+            },
+            "headers": {
+              "type": "object",
+              "description": "Optional map of HTTP header names to values",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
           },
-          "required": ["url"],
+          "required": [
+            "url"
+          ],
           "additionalProperties": false
         }
       }
@@ -27,10 +39,18 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "url": { "type": "string" },
-            "body": { "type": "object", "additionalProperties": true }
+            "url": {
+              "type": "string"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": true
+            }
           },
-          "required": ["url", "body"],
+          "required": [
+            "url",
+            "body"
+          ],
           "additionalProperties": false
         }
       }
@@ -43,9 +63,13 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "query": { "type": "string" }
+            "query": {
+              "type": "string"
+            }
           },
-          "required": ["query"],
+          "required": [
+            "query"
+          ],
           "additionalProperties": false
         }
       }
@@ -53,7 +77,12 @@
   ],
   "expected": {
     "calls": [
-      { "name": "http_get", "arguments": { "url": "https://api.github.com/repos/python/cpython" } }
+      {
+        "name": "http_get",
+        "arguments": {
+          "url": "https://api.github.com/repos/python/cpython"
+        }
+      }
     ]
   }
 }

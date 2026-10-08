@@ -12,9 +12,14 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path to the file to read, e.g. /etc/hostname"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -27,10 +32,17 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" },
-            "contents": { "type": "string" }
+            "path": {
+              "type": "string"
+            },
+            "contents": {
+              "type": "string"
+            }
           },
-          "required": ["path", "contents"],
+          "required": [
+            "path",
+            "contents"
+          ],
           "additionalProperties": false
         }
       }
@@ -43,10 +55,17 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "src": { "type": "string" },
-            "dst": { "type": "string" }
+            "src": {
+              "type": "string"
+            },
+            "dst": {
+              "type": "string"
+            }
           },
-          "required": ["src", "dst"],
+          "required": [
+            "src",
+            "dst"
+          ],
           "additionalProperties": false
         }
       }

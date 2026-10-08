@@ -8,18 +8,44 @@
       "type": "function",
       "function": {
         "name": "schedule_meeting",
-        "description": "Schedule a calendar meeting. `attendees` is a list of email addresses, `date` is YYYY-MM-DD, `time` is HH:MM in 24h, `timezone` is an IANA tz like 'UTC', `duration_minutes` is an integer.",
+        "description": "Schedule a calendar meeting. `attendees` is a list of email addresses, `date` is YYYY-MM-DD, `time` is HH:MM in 24h, `timezone` is an IANA tz like 'Europe/London', `duration_minutes` is an integer.",
         "parameters": {
           "type": "object",
           "properties": {
-            "title": { "type": "string" },
-            "attendees": { "type": "array", "items": { "type": "string" } },
-            "date": { "type": "string" },
-            "time": { "type": "string" },
-            "timezone": { "type": "string" },
-            "duration_minutes": { "type": "integer" }
+            "title": {
+              "type": "string"
+            },
+            "attendees": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "email"
+              }
+            },
+            "date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "time": {
+              "type": "string",
+              "pattern": "^\\d{2}:\\d{2}$"
+            },
+            "timezone": {
+              "type": "string"
+            },
+            "duration_minutes": {
+              "type": "integer",
+              "minimum": 1
+            }
           },
-          "required": ["title", "attendees", "date", "time", "timezone", "duration_minutes"],
+          "required": [
+            "title",
+            "attendees",
+            "date",
+            "time",
+            "timezone",
+            "duration_minutes"
+          ],
           "additionalProperties": false
         }
       }
@@ -32,9 +58,13 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "timezone": { "type": "string" }
+            "timezone": {
+              "type": "string"
+            }
           },
-          "required": ["timezone"],
+          "required": [
+            "timezone"
+          ],
           "additionalProperties": false
         }
       }
@@ -47,9 +77,13 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "meeting_id": { "type": "string" }
+            "meeting_id": {
+              "type": "string"
+            }
           },
-          "required": ["meeting_id"],
+          "required": [
+            "meeting_id"
+          ],
           "additionalProperties": false
         }
       }
@@ -62,10 +96,17 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "from": { "type": "string" },
-            "to": { "type": "string" }
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
           },
-          "required": ["from", "to"],
+          "required": [
+            "from",
+            "to"
+          ],
           "additionalProperties": false
         }
       }

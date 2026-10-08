@@ -12,11 +12,22 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "command": { "type": "string" },
-            "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 60 },
-            "confirm": { "type": "boolean", "description": "Must be true for any command that writes outside /tmp or invokes package managers." }
+            "command": {
+              "type": "string"
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "confirm": {
+              "type": "boolean",
+              "description": "Must be true for any command that writes outside /tmp or invokes package managers."
+            }
           },
-          "required": ["command"],
+          "required": [
+            "command"
+          ],
           "additionalProperties": false
         }
       }
@@ -25,11 +36,13 @@
       "type": "function",
       "function": {
         "name": "read_env",
-        "description": "Read the value of a single environment variable, or list all env var names if `name` is omitted.",
+        "description": "Read the value of a single environment variable. If `name` is omitted, returns a JSON object of {name: value} for every env var. Sensitive variables (anything containing 'SECRET', 'TOKEN', 'KEY', or 'PASSWORD' in the name) are redacted to '<redacted>' for safety.",
         "parameters": {
           "type": "object",
           "properties": {
-            "name": { "type": "string" }
+            "name": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
         }
@@ -43,7 +56,9 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "filter_user": { "type": "string" }
+            "filter_user": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
         }
@@ -54,7 +69,9 @@
     "calls": [
       {
         "name": "run_shell_command",
-        "arguments": { "command": "head -n 5 /var/log/syslog" },
+        "arguments": {
+          "command": "head -n 5 /var/log/syslog"
+        },
         "command_equivalents": [
           "head -n 5 /var/log/syslog",
           "head -n5 /var/log/syslog",

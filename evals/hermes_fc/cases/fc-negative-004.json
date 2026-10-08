@@ -12,9 +12,14 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path to the file to read, e.g. /etc/hostname"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -27,10 +32,17 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" },
-            "contents": { "type": "string" }
+            "path": {
+              "type": "string"
+            },
+            "contents": {
+              "type": "string"
+            }
           },
-          "required": ["path", "contents"],
+          "required": [
+            "path",
+            "contents"
+          ],
           "additionalProperties": false
         }
       }
@@ -43,9 +55,14 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path of the file to delete"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -58,10 +75,19 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "src": { "type": "string" },
-            "dst": { "type": "string" }
+            "src": {
+              "type": "string",
+              "description": "Absolute path of the source file"
+            },
+            "dst": {
+              "type": "string",
+              "description": "Absolute path of the destination file"
+            }
           },
-          "required": ["src", "dst"],
+          "required": [
+            "src",
+            "dst"
+          ],
           "additionalProperties": false
         }
       }
