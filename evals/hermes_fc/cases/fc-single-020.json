@@ -12,11 +12,22 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "command": { "type": "string" },
-            "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 60 },
-            "confirm": { "type": "boolean" }
+            "command": {
+              "type": "string"
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "confirm": {
+              "type": "boolean",
+              "description": "Must be true for any command that writes outside /tmp or invokes package managers."
+            }
           },
-          "required": ["command"],
+          "required": [
+            "command"
+          ],
           "additionalProperties": false
         }
       }
@@ -29,7 +40,9 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "name": { "type": "string" }
+            "name": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
         }
@@ -43,7 +56,9 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "filter_user": { "type": "string" }
+            "filter_user": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
         }
@@ -52,7 +67,12 @@
   ],
   "expected": {
     "calls": [
-      { "name": "list_processes", "arguments": { "filter_user": "mysql" } }
+      {
+        "name": "list_processes",
+        "arguments": {
+          "filter_user": "mysql"
+        }
+      }
     ]
   }
 }

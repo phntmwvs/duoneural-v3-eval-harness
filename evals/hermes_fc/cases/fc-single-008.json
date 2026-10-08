@@ -8,18 +8,31 @@
       "type": "function",
       "function": {
         "name": "transform_json",
-        "description": "Apply a small set of named transforms to a JSON value loaded from disk. Returns the transformed value as a JSON string. `operation` is one of: 'rename_field' (rename a top-level field), 'drop_field' (remove a top-level field), 'project' (keep only a whitelisted set of top-level fields).",
+        "description": "Apply a small set of named transforms to a JSON value loaded from disk. Returns the transformed value as a JSON string. `operation` is one of: 'rename_field' (rename a top-level field — args: {\"from\": \"old_name\", \"to\": \"new_name\"}), 'drop_field' (remove a top-level field — args: {\"field\": \"field_name\"}), 'project' (keep only a whitelisted set of top-level fields — args: {\"fields\": [\"field_a\", \"field_b\"]}).",
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" },
+            "path": {
+              "type": "string"
+            },
             "operation": {
               "type": "string",
-              "enum": ["rename_field", "drop_field", "project"]
+              "enum": [
+                "rename_field",
+                "drop_field",
+                "project"
+              ]
             },
-            "args": { "type": "object", "additionalProperties": true }
+            "args": {
+              "type": "object",
+              "additionalProperties": true
+            }
           },
-          "required": ["path", "operation", "args"],
+          "required": [
+            "path",
+            "operation",
+            "args"
+          ],
           "additionalProperties": false
         }
       }
@@ -28,13 +41,18 @@
       "type": "function",
       "function": {
         "name": "read_file",
-        "description": "Read the full text contents of a file at the given absolute path.",
+        "description": "Read the full text contents of a file at the given absolute path. Returns the file contents as a UTF-8 string, or an error if the file does not exist or is not readable.",
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path to the file to read, e.g. /etc/hostname"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -47,10 +65,17 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" },
-            "contents": { "type": "string" }
+            "path": {
+              "type": "string"
+            },
+            "contents": {
+              "type": "string"
+            }
           },
-          "required": ["path", "contents"],
+          "required": [
+            "path",
+            "contents"
+          ],
           "additionalProperties": false
         }
       }
@@ -63,7 +88,9 @@
         "arguments": {
           "path": "/data/customers.json",
           "operation": "drop_field",
-          "args": { "field": "ssn" }
+          "args": {
+            "field": "ssn"
+          }
         }
       }
     ]

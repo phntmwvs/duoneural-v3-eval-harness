@@ -12,9 +12,14 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path to the file to read, e.g. /etc/hostname"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -27,9 +32,13 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" }
+            "path": {
+              "type": "string"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -42,9 +51,14 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string", "description": "Absolute path of the file to delete" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path of the file to delete"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -52,9 +66,24 @@
   ],
   "expected": {
     "calls": [
-      { "name": "list_directory", "arguments": { "path": "/tmp/old-builds/" } },
-      { "name": "delete_file", "arguments": { "path": "/tmp/old-builds/app-1.0.tar.gz" } },
-      { "name": "delete_file", "arguments": { "path": "/tmp/old-builds/app-1.1.tar.gz" } }
+      {
+        "name": "list_directory",
+        "arguments": {
+          "path": "/tmp/old-builds/"
+        }
+      },
+      {
+        "name": "delete_file",
+        "arguments": {
+          "path": "/tmp/old-builds/app-1.0.tar.gz"
+        }
+      },
+      {
+        "name": "delete_file",
+        "arguments": {
+          "path": "/tmp/old-builds/app-1.1.tar.gz"
+        }
+      }
     ]
   },
   "depends_on_order": true

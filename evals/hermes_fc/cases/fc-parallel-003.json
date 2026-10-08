@@ -1,5 +1,5 @@
 {
-  "_doc": "tool defs canonicalized from fc-single-003 (transform_json with full schema); do not edit in place \u2014 sync from canonical single cases.",
+  "_doc": "tool defs canonicalized from fc-single-003 (transform_json with full schema); do not edit in place — sync from canonical single cases.",
   "id": "fc-parallel-003",
   "category": "parallel",
   "prompt": "Three customer-data files need scrubbing before they go to staging. For each, drop the 'ssn' field and drop the 'credit_card' field. Files: /data/customers.json, /data/orders.json, /data/addresses.json. Report back the path of each scrubbed file and the operation you performed.",
@@ -8,7 +8,7 @@
       "type": "function",
       "function": {
         "name": "transform_json",
-        "description": "Apply a small set of named transforms (rename_field, drop_field, project) to a JSON value loaded from disk. Returns the transformed value as a JSON string.",
+        "description": "Apply a small set of named transforms to a JSON value loaded from disk. Returns the transformed value as a JSON string. `operation` is one of: 'rename_field' (rename a top-level field — args: {\"from\": \"old_name\", \"to\": \"new_name\"}), 'drop_field' (remove a top-level field — args: {\"field\": \"field_name\"}), 'project' (keep only a whitelisted set of top-level fields — args: {\"fields\": [\"field_a\", \"field_b\"]}).",
         "parameters": {
           "type": "object",
           "properties": {

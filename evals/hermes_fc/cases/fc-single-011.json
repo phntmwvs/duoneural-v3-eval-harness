@@ -12,9 +12,14 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path to the file to read, e.g. /etc/hostname"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -27,9 +32,13 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string" }
+            "path": {
+              "type": "string"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -42,9 +51,14 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "path": { "type": "string", "description": "Absolute path of the file to delete" }
+            "path": {
+              "type": "string",
+              "description": "Absolute path of the file to delete"
+            }
           },
-          "required": ["path"],
+          "required": [
+            "path"
+          ],
           "additionalProperties": false
         }
       }
@@ -52,7 +66,12 @@
   ],
   "expected": {
     "calls": [
-      { "name": "delete_file", "arguments": { "path": "/var/log/app/app.log.2023-01-01.gz" } }
+      {
+        "name": "delete_file",
+        "arguments": {
+          "path": "/var/log/app/app.log.2023-01-01.gz"
+        }
+      }
     ]
   }
 }

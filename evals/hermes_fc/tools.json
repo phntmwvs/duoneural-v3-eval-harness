@@ -1,6 +1,6 @@
 {
-  "_doc": "Reference catalog of the 5 tool families used across the Hermes FC suite (issue #4 / issue #12). Not consumed by the scorer in v1.0 (each case file embeds its own `tools[]`). Kept here as the single source of truth for tool names + argument shapes so case authors stay consistent.",
-  "version": "0.1.0",
+  "_doc": "Canonical definitions for the 20 tools used across the Hermes FC suite (issue #4 / issue #12; v0.2.0 per issue #33). Each case embeds a snapshot of the definitions it uses; tests/test_hermes_case_schema.py asserts every embedded copy matches this file exactly, so this is the single source of truth and drift fails at unittest time. Not consumed by the runner in v1.0 (the adapter sends each case's embedded tools[] verbatim).",
+  "version": "0.2.0",
   "domains": {
     "filesystem": {
       "tools": ["read_file", "write_file", "list_directory", "delete_file", "copy_file", "move_file"]
@@ -16,6 +16,290 @@
     },
     "system": {
       "tools": ["run_shell_command", "read_env", "list_processes"]
+    }
+  },
+  "definitions": {
+    "read_file": {
+      "name": "read_file",
+      "description": "Read the full text contents of a file at the given absolute path. Returns the file contents as a UTF-8 string, or an error if the file does not exist or is not readable.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Absolute path to the file to read, e.g. /etc/hostname" }
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      }
+    },
+    "write_file": {
+      "name": "write_file",
+      "description": "Write a UTF-8 string to a file at the given absolute path, overwriting any existing contents.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "contents": { "type": "string" }
+        },
+        "required": ["path", "contents"],
+        "additionalProperties": false
+      }
+    },
+    "list_directory": {
+      "name": "list_directory",
+      "description": "List the names of entries (files and subdirectories) directly inside the given absolute directory path. Non-recursive.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" }
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      }
+    },
+    "delete_file": {
+      "name": "delete_file",
+      "description": "Delete a file at the given absolute path. Irreversible. Returns an error if the file does not exist, if the path is a directory, or if the caller lacks write permission.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Absolute path of the file to delete" }
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      }
+    },
+    "copy_file": {
+      "name": "copy_file",
+      "description": "Copy a file from `src` to `dst`. Creates `dst`'s parent directories if they don't already exist. Overwrites `dst` if it exists.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "src": { "type": "string", "description": "Absolute path of the source file" },
+          "dst": { "type": "string", "description": "Absolute path of the destination file" }
+        },
+        "required": ["src", "dst"],
+        "additionalProperties": false
+      }
+    },
+    "move_file": {
+      "name": "move_file",
+      "description": "Rename or move a file or directory. Both paths must be absolute. Fails if `dst` exists.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "src": { "type": "string" },
+          "dst": { "type": "string" }
+        },
+        "required": ["src", "dst"],
+        "additionalProperties": false
+      }
+    },
+    "http_get": {
+      "name": "http_get",
+      "description": "Issue an HTTP GET request to the given absolute URL and return the response body as a string. The optional `headers` field is a JSON object of header name to value. Follows up to 5 redirects.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "description": "Absolute URL to GET, e.g. https://example.com/api/readme" },
+          "headers": {
+            "type": "object",
+            "description": "Optional map of HTTP header names to values",
+            "additionalProperties": { "type": "string" }
+          }
+        },
+        "required": ["url"],
+        "additionalProperties": false
+      }
+    },
+    "http_post": {
+      "name": "http_post",
+      "description": "Issue an HTTP POST request to the given absolute URL with a JSON body. Returns the response body as a string.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string" },
+          "body": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["url", "body"],
+        "additionalProperties": false
+      }
+    },
+    "web_search": {
+      "name": "web_search",
+      "description": "Run a web search query and return the top 5 results as a JSON array of {title, url, snippet}.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      }
+    },
+    "parse_json": {
+      "name": "parse_json",
+      "description": "Parse a JSON string and return the resulting value (object, array, or scalar). Throws on invalid JSON.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "Raw JSON text to parse" }
+        },
+        "required": ["text"],
+        "additionalProperties": false
+      }
+    },
+    "extract_field": {
+      "name": "extract_field",
+      "description": "Read a JSON value at the given absolute file path and return the value at the given JSONPath expression, e.g. \"$['users'][?(@.id==42)].email\". Returns null if no node matches.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Absolute path to a JSON file on disk" },
+          "field": { "type": "string", "description": "JSONPath expression (RFC 9535 syntax)" }
+        },
+        "required": ["path", "field"],
+        "additionalProperties": false
+      }
+    },
+    "transform_json": {
+      "name": "transform_json",
+      "description": "Apply a small set of named transforms to a JSON value loaded from disk. Returns the transformed value as a JSON string. `operation` is one of: 'rename_field' (rename a top-level field — args: {\"from\": \"old_name\", \"to\": \"new_name\"}), 'drop_field' (remove a top-level field — args: {\"field\": \"field_name\"}), 'project' (keep only a whitelisted set of top-level fields — args: {\"fields\": [\"field_a\", \"field_b\"]}).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "operation": {
+            "type": "string",
+            "enum": ["rename_field", "drop_field", "project"]
+          },
+          "args": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["path", "operation", "args"],
+        "additionalProperties": false
+      }
+    },
+    "filter_records": {
+      "name": "filter_records",
+      "description": "Load a JSON file containing a list of records (or an object with a 'records' field), apply a JSONPath predicate filter, and return the matching records as a JSON array. Returns an empty array if nothing matches.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Absolute path to a JSON file on disk containing a list (or {records: [...]})" },
+          "filter": { "type": "string", "description": "JSONPath predicate, e.g. \"$[?(@.in_stock==true)]\"" }
+        },
+        "required": ["path", "filter"],
+        "additionalProperties": false
+      }
+    },
+    "aggregate": {
+      "name": "aggregate",
+      "description": "Compute an aggregate over a list of records loaded from a JSON file. `operation` is one of 'count', 'sum', 'avg', 'min', 'max'. `field` is the field to aggregate over (omit `field` for `count`, which counts records regardless of fields). Returns a number.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "operation": {
+            "type": "string",
+            "enum": ["count", "sum", "avg", "min", "max"]
+          },
+          "field": { "type": "string" }
+        },
+        "required": ["path", "operation"],
+        "additionalProperties": false
+      }
+    },
+    "get_current_time": {
+      "name": "get_current_time",
+      "description": "Return the current local time in the given IANA timezone.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "timezone": { "type": "string" }
+        },
+        "required": ["timezone"],
+        "additionalProperties": false
+      }
+    },
+    "schedule_meeting": {
+      "name": "schedule_meeting",
+      "description": "Schedule a calendar meeting. `attendees` is a list of email addresses, `date` is YYYY-MM-DD, `time` is HH:MM in 24h, `timezone` is an IANA tz like 'Europe/London', `duration_minutes` is an integer.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "attendees": { "type": "array", "items": { "type": "string", "format": "email" } },
+          "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "time": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
+          "timezone": { "type": "string" },
+          "duration_minutes": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["title", "attendees", "date", "time", "timezone", "duration_minutes"],
+        "additionalProperties": false
+      }
+    },
+    "cancel_meeting": {
+      "name": "cancel_meeting",
+      "description": "Cancel a previously scheduled meeting by its id.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "meeting_id": { "type": "string" }
+        },
+        "required": ["meeting_id"],
+        "additionalProperties": false
+      }
+    },
+    "list_calendar": {
+      "name": "list_calendar",
+      "description": "List meetings scheduled between two ISO datetimes.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" }
+        },
+        "required": ["from", "to"],
+        "additionalProperties": false
+      }
+    },
+    "run_shell_command": {
+      "name": "run_shell_command",
+      "description": "Execute a shell command in a sandboxed non-interactive shell and return its combined stdout+stderr. Read-only commands are recommended; commands that modify the filesystem require explicit confirmation via `confirm: true`.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": { "type": "string" },
+          "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 60 },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true for any command that writes outside /tmp or invokes package managers."
+          }
+        },
+        "required": ["command"],
+        "additionalProperties": false
+      }
+    },
+    "read_env": {
+      "name": "read_env",
+      "description": "Read the value of a single environment variable. If `name` is omitted, returns a JSON object of {name: value} for every env var. Sensitive variables (anything containing 'SECRET', 'TOKEN', 'KEY', or 'PASSWORD' in the name) are redacted to '<redacted>' for safety.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "list_processes": {
+      "name": "list_processes",
+      "description": "Return a snapshot of running processes as a JSON array of {pid, user, command}.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "filter_user": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
     }
   }
 }

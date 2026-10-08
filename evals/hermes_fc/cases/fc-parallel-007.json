@@ -12,10 +12,21 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "url": { "type": "string" },
-            "headers": { "type": "object", "additionalProperties": { "type": "string" } }
+            "url": {
+              "type": "string",
+              "description": "Absolute URL to GET, e.g. https://example.com/api/readme"
+            },
+            "headers": {
+              "type": "object",
+              "description": "Optional map of HTTP header names to values",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
           },
-          "required": ["url"],
+          "required": [
+            "url"
+          ],
           "additionalProperties": false
         }
       }
@@ -28,10 +39,18 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "url": { "type": "string" },
-            "body": { "type": "object", "additionalProperties": true }
+            "url": {
+              "type": "string"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": true
+            }
           },
-          "required": ["url", "body"],
+          "required": [
+            "url",
+            "body"
+          ],
           "additionalProperties": false
         }
       }
@@ -39,9 +58,28 @@
   ],
   "expected": {
     "calls": [
-      { "name": "http_get", "arguments": { "url": "https://api.example.com/orders/42" } },
-      { "name": "http_get", "arguments": { "url": "https://api.example.com/customers/alice" } },
-      { "name": "http_post", "arguments": { "url": "https://api.example.com/summarize", "body": { "customer": "alice", "order": 42 } } }
+      {
+        "name": "http_get",
+        "arguments": {
+          "url": "https://api.example.com/orders/42"
+        }
+      },
+      {
+        "name": "http_get",
+        "arguments": {
+          "url": "https://api.example.com/customers/alice"
+        }
+      },
+      {
+        "name": "http_post",
+        "arguments": {
+          "url": "https://api.example.com/summarize",
+          "body": {
+            "customer": "alice",
+            "order": 42
+          }
+        }
+      }
     ]
   },
   "depends_on_order": true
