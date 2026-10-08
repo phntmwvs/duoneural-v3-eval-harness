@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-016 (filesystem): move_file with src/dst; the prompt states the archive directory already exists, so no mkdir step is needed. Decoys are read_file and write_file. Tests picking move over copy/write and extracting both paths.",
   "id": "fc-single-016",
   "category": "single",
   "prompt": "Move /var/log/app/app.log to /var/log/app/archive/app.log.2023-Q4. The archive directory should already exist.",

@@ -1,0 +1,42 @@
+{
+  "_doc": "fc-system2-004 (data, transform_json with operation reasoning): the user wants the 'price' field renamed to 'unit_price' in /data/products.json. The model has to know that the right operation is 'rename_field' (not drop_field or project) and the right args shape is {from: 'price', to: 'unit_price'}. The reasoning required: reading the transform_json tool description and picking the right operation + arg shape. Single tool exposed.",
+  "id": "fc-system2-004",
+  "category": "system2",
+  "prompt": "/data/products.json contains a list of products, each with fields id, name, price, category. Rename the 'price' field to 'unit_price' in the returned JSON. Use transform_json with the rename_field operation.",
+  "system": "Before answering, write your reasoning inside a <thought>...</thought> block. Then call the tool using the <tool_call> format.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "transform_json",
+        "description": "Apply a small set of named transforms to a JSON value loaded from disk. Returns the transformed value as a JSON string. `operation` is one of: 'rename_field' (rename a top-level field — args: {\"from\": \"old_name\", \"to\": \"new_name\"}), 'drop_field' (remove a top-level field — args: {\"field\": \"field_name\"}), 'project' (keep only a whitelisted set of top-level fields — args: {\"fields\": [\"field_a\", \"field_b\"]}).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "operation": {
+              "type": "string",
+              "enum": ["rename_field", "drop_field", "project"]
+            },
+            "args": { "type": "object", "additionalProperties": true }
+          },
+          "required": ["path", "operation", "args"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      {
+        "name": "transform_json",
+        "arguments": {
+          "path": "/data/products.json",
+          "operation": "rename_field",
+          "args": { "from": "price", "to": "unit_price" }
+        }
+      }
+    ]
+  },
+  "require_thought": true
+}

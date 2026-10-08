@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-011 (filesystem): delete_file with the single named path. Decoys are read_file and list_directory. The prompt stresses 'leave all other files alone', testing that the model acts on exactly the named file rather than listing or broadening the scope.",
   "id": "fc-single-011",
   "category": "single",
   "prompt": "Delete the archived log file /var/log/app/app.log.2023-01-01.gz — it has already been copied to long-term storage. Leave all other files in /var/log/app/ alone.",

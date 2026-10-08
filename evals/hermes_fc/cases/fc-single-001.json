@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-001 (filesystem): read_file with an explicitly named path (/etc/hostname). Decoys are write_file and list_directory. The prompt names the file, so this tests picking the read verb over write/list and extracting the literal path arg.",
   "id": "fc-single-001",
   "category": "single",
   "prompt": "Read the contents of /etc/hostname and tell me what host this server reports as.",

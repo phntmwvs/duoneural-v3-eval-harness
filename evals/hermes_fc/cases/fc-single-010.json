@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-010 (system): read_env with name 'PATH'. Decoys are run_shell_command and list_processes. Tests preferring the dedicated env-lookup tool over `echo $PATH` via the shell.",
   "id": "fc-single-010",
   "category": "single",
   "prompt": "Look up the value of the PATH environment variable and tell me what it is.",

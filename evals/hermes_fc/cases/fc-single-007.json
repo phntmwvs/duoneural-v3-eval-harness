@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-007 (web): web_search with the query 'latest stable release of Python'. Decoy is http_get. Tests choosing the search verb over a direct fetch and phrasing a query. Sibling of fc-system2-003 (same pattern, Rust variant); the query arg carries command_equivalents because query phrasings vary (review of PR #34, M1).",
   "id": "fc-single-007",
   "category": "single",
   "prompt": "Search the web for the latest stable release of the Python programming language. I want the version number and the release date.",
@@ -36,7 +37,18 @@
   ],
   "expected": {
     "calls": [
-      { "name": "web_search", "arguments": { "query": "latest stable release of Python" } }
+      {
+        "name": "web_search",
+        "arguments": { "query": "latest stable release of Python" },
+        "command_equivalents": [
+          "latest stable release of Python",
+          "latest stable Python release",
+          "latest stable version of Python",
+          "current stable Python release",
+          "most recent stable release of Python",
+          "Python latest stable version"
+        ]
+      }
     ]
   }
 }

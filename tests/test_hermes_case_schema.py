@@ -3,11 +3,12 @@
 Loads every JSON file in ``evals/hermes_fc/cases/`` and asserts:
 
 - required top-level fields are present (id, category, prompt, tools, expected);
+- every case carries a non-empty ``_doc`` one-liner (author-facing description);
 - category is one of {single, parallel, negative, system2};
 - every tool has a JSON-Schema object ``parameters`` block with ``type: object``;
 - every ``expected.call.name`` is one of the case's tool names;
 - every ``expected.call`` has an ``arguments`` dict;
-- system2 cases have ``require_thought: true``;
+- system2 cases have a non-empty ``system`` field and ``require_thought: true``;
 - negative cases have an empty ``expected.calls`` list;
 - single + parallel + system2 cases have at least one ``expected.call``;
 - ids are unique across the directory;
@@ -66,6 +67,23 @@ class TestCaseSchema(unittest.TestCase):
             missing = required - set(c.keys())
             self.assertFalse(missing, f"{fname}: missing {sorted(missing)}")
 
+    def test_all_cases_have_doc(self):
+        # N5 from the review of PR #34 (recurring from PR #31): ``_doc`` is
+        # an author-facing one-line description of what a case tests. It was
+        # present on some cases and missing on others, so enforce it on every
+        # case (as a non-empty string) to keep the suite uniform.
+        for fname, c in self.cases:
+            doc = c.get("_doc")
+            self.assertIsInstance(
+                doc, str,
+                f"{fname}: missing '_doc' (or not a string) — every case "
+                f"needs a one-line description of what it tests",
+            )
+            self.assertTrue(
+                doc.strip(),
+                f"{fname}: '_doc' must be a non-empty string",
+            )
+
     def test_category_valid(self):
         for fname, c in self.cases:
             self.assertIn(
@@ -121,6 +139,43 @@ class TestCaseSchema(unittest.TestCase):
                 self.assertIs(
                     c.get("require_thought"), True,
                     f"{fname}: system2 must have require_thought: true",
+                )
+
+    def test_system2_has_system_field(self):
+        # Per the #4 amendment (2026-10-07): system2 cases carry a
+        # 'think first' system message. The v3 4-bit model does not
+        # emit `` reliably under the stock template; the system
+        # field is what makes the gate clear. A system2 case without
+        # a system field will score 0/10 thought 100% of the time.
+        for fname, c in self.cases:
+            if c["category"] == "system2":
+                system = c.get("system")
+                self.assertIsInstance(
+                    system, str,
+                    f"{fname}: system2 must have a 'system' field "
+                    f"(the 'think first' nudge per the #4 amendment); "
+                    f"got {type(system).__name__}",
+                )
+                self.assertTrue(
+                    system.strip(),
+                    f"{fname}: system2 'system' field must be a non-empty "
+                    f"string — an empty system message does not clear the "
+                    f"<thought> gate",
+                )
+
+    def test_system2_has_at_most_one_tool(self):
+        # The v3 4-bit model runs out of output tokens (512 cap) when
+        # exposed to 4 detailed tool schemas — observed in the
+        # ``<thought>``-emission probe (see evals/hermes_fc/PROBE_RESULTS.md).
+        # Limiting system2 cases to 1 tool keeps the thought + call
+        # inside the token budget. The probe did not test 2-tool
+        # cases, so we conservatively cap at 1 until we have data.
+        for fname, c in self.cases:
+            if c["category"] == "system2":
+                self.assertLessEqual(
+                    len(c["tools"]), 1,
+                    f"{fname}: system2 cases must expose at most 1 tool "
+                    f"(found {len(c['tools'])})",
                 )
 
     def test_depends_on_order_only_on_parallel(self):

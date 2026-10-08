@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-012 (web): http_post with a url and a structured JSON body ({service, status}). Decoys are http_get and web_search. Tests picking POST over GET and turning a prose body spec into a JSON object.",
   "id": "fc-single-012",
   "category": "single",
   "prompt": "Send a heartbeat POST to the monitoring endpoint. Body must be a JSON object: {\"service\": \"auth\", \"status\": \"ok\"}. The endpoint is https://api.example.com/heartbeat.",

@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-019 (data): transform_json with the project operation and args {fields: ['id','name']} on /data/products.json. Decoys are parse_json, extract_field and filter_records. Tests choosing project (a field whitelist) over extraction/filtering.",
   "id": "fc-single-019",
   "category": "single",
   "prompt": "From /data/products.json, give me a list that keeps only the 'id' and 'name' fields of each product. Report the result in prose.",

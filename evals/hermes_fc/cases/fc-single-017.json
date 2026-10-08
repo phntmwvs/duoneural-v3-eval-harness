@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-017 (web): http_get with an explicit GitHub API URL. Decoys are http_post and web_search. Sibling of fc-single-002 (GET extraction); tests the verb choice with a JSON API endpoint.",
   "id": "fc-single-017",
   "category": "single",
   "prompt": "Fetch the JSON response at https://api.github.com/repos/python/cpython and tell me the star count.",

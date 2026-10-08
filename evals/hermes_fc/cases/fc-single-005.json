@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-005 (system): run_shell_command with 'head -n 5 /var/log/syslog'. Decoys are read_env and list_processes. command_equivalents accepts the three common head spellings. Tests command construction and choosing the shell tool over the narrower verbs.",
   "id": "fc-single-005",
   "category": "single",
   "prompt": "Run a shell command that prints the first 5 lines of /var/log/syslog. Do not modify anything.",

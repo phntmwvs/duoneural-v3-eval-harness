@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-003 (data): extract_field with a JSONPath predicate ($['users'][?(@.id==42)].email). Decoys are parse_json and transform_json. Tests translating 'the user whose id equals 42' into a filter expression rather than a bare field name.",
   "id": "fc-single-003",
   "category": "single",
   "prompt": "Parse the JSON at /data/users.json and return the email address of the user whose id field equals 42.",
