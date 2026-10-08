@@ -1,0 +1,105 @@
+{
+  "_doc": "tool defs canonicalized from fc-single-003 (transform_json with full schema); do not edit in place \u2014 sync from canonical single cases.",
+  "id": "fc-parallel-003",
+  "category": "parallel",
+  "prompt": "Three customer-data files need scrubbing before they go to staging. For each, drop the 'ssn' field and drop the 'credit_card' field. Files: /data/customers.json, /data/orders.json, /data/addresses.json. Report back the path of each scrubbed file and the operation you performed.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "transform_json",
+        "description": "Apply a small set of named transforms (rename_field, drop_field, project) to a JSON value loaded from disk. Returns the transformed value as a JSON string.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "operation": {
+              "type": "string",
+              "enum": [
+                "rename_field",
+                "drop_field",
+                "project"
+              ]
+            },
+            "args": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "path",
+            "operation",
+            "args"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      {
+        "name": "transform_json",
+        "arguments": {
+          "path": "/data/customers.json",
+          "operation": "drop_field",
+          "args": {
+            "field": "ssn"
+          }
+        }
+      },
+      {
+        "name": "transform_json",
+        "arguments": {
+          "path": "/data/customers.json",
+          "operation": "drop_field",
+          "args": {
+            "field": "credit_card"
+          }
+        }
+      },
+      {
+        "name": "transform_json",
+        "arguments": {
+          "path": "/data/orders.json",
+          "operation": "drop_field",
+          "args": {
+            "field": "ssn"
+          }
+        }
+      },
+      {
+        "name": "transform_json",
+        "arguments": {
+          "path": "/data/orders.json",
+          "operation": "drop_field",
+          "args": {
+            "field": "credit_card"
+          }
+        }
+      },
+      {
+        "name": "transform_json",
+        "arguments": {
+          "path": "/data/addresses.json",
+          "operation": "drop_field",
+          "args": {
+            "field": "ssn"
+          }
+        }
+      },
+      {
+        "name": "transform_json",
+        "arguments": {
+          "path": "/data/addresses.json",
+          "operation": "drop_field",
+          "args": {
+            "field": "credit_card"
+          }
+        }
+      }
+    ]
+  }
+}

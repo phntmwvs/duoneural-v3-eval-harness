@@ -1,0 +1,104 @@
+{
+  "_doc": "tool defs canonicalized from fc-single-004 (schedule_meeting, list_calendar); do not edit in place \u2014 sync from canonical single cases.",
+  "id": "fc-parallel-004",
+  "category": "parallel",
+  "prompt": "Create a new team meeting: 'Engineering sync' on 2026-11-09 at 15:00 UTC, 60 minutes, attendees: alice@example.com, bob@example.com, carol@example.com. Once it's scheduled, list everything on the calendar for 2026-11-09 so I can confirm the new meeting is there.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "schedule_meeting",
+        "description": "Schedule a calendar meeting. `attendees` is a list of email addresses, `date` is YYYY-MM-DD, `time` is HH:MM in 24h, `timezone` is an IANA tz like 'Europe/London', `duration_minutes` is an integer.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "attendees": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "email"
+              }
+            },
+            "date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "time": {
+              "type": "string",
+              "pattern": "^\\d{2}:\\d{2}$"
+            },
+            "timezone": {
+              "type": "string"
+            },
+            "duration_minutes": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "title",
+            "attendees",
+            "date",
+            "time",
+            "timezone",
+            "duration_minutes"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_calendar",
+        "description": "List meetings scheduled between two ISO datetimes.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      {
+        "name": "schedule_meeting",
+        "arguments": {
+          "title": "Engineering sync",
+          "attendees": [
+            "alice@example.com",
+            "bob@example.com",
+            "carol@example.com"
+          ],
+          "date": "2026-11-09",
+          "time": "15:00",
+          "timezone": "UTC",
+          "duration_minutes": 60
+        }
+      },
+      {
+        "name": "list_calendar",
+        "arguments": {
+          "from": "2026-11-09T00:00:00Z",
+          "to": "2026-11-10T00:00:00Z"
+        }
+      }
+    ]
+  },
+  "depends_on_order": true
+}
