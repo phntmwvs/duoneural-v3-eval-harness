@@ -1,0 +1,65 @@
+{
+  "id": "fc-single-016",
+  "category": "single",
+  "prompt": "Move /var/log/app/app.log to /var/log/app/archive/app.log.2023-Q4. The archive directory should already exist.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "read_file",
+        "description": "Read the full text contents of a file at the given absolute path. Returns the file contents as a UTF-8 string, or an error if the file does not exist or is not readable.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "write_file",
+        "description": "Write a UTF-8 string to a file at the given absolute path, overwriting any existing contents.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "contents": { "type": "string" }
+          },
+          "required": ["path", "contents"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "move_file",
+        "description": "Rename or move a file or directory. Both paths must be absolute. Fails if `dst` exists.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "src": { "type": "string" },
+            "dst": { "type": "string" }
+          },
+          "required": ["src", "dst"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      {
+        "name": "move_file",
+        "arguments": {
+          "src": "/var/log/app/app.log",
+          "dst": "/var/log/app/archive/app.log.2023-Q4"
+        }
+      }
+    ]
+  }
+}
