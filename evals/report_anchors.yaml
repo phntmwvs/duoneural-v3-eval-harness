@@ -1,0 +1,29 @@
+# DuoNeural v3 + LiquidAI base — published benchmark anchors (ticket #7)
+#
+# Vendored anchors for the eval report's base-vs-published cross-check table.
+# These are the figures the report cross-references the locally-measured
+# scores against. Updated by hand when a vendor revises a card; the diff
+# carries the source URL + retrieval date so the change is reviewable.
+#
+# retrieved: 2026-10-09
+# sources:
+#   - https://huggingface.co/DuoNeural/LFM2.5-8B-A1B-Hermes-Agentic-Coder-Abliterated-v3
+#       "📈 Benchmark Evolution: Stock LFM vs. v2 vs. v3" table (v3 column).
+#   - https://huggingface.co/LiquidAI/LFM2.5-8B-A1B
+#       "📊 Performance" → "Math and agentic workflows" table (BFCLv3 row).
+#
+# Units: percentage points (the values on the card). Local pass-fpcts are
+# scaled to the same units inside ``evals/report.py``.
+
+duoneural_v3:
+  evalplus:
+    humaneval_base_pct: 56.1
+    humaneval_plus_pct: 50.0
+    mbpp_base_pct: 60.8
+    mbpp_plus_pct: 49.7
+  hermes:
+    fc_ast_pct: 100.0
+
+liquidai_base:
+  bfcl:
+    bfclv3_pct: 64.79
