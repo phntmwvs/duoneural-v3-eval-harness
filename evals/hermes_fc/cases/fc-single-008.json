@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-008 (data): transform_json with the drop_field operation and args {field: 'ssn'} on /data/customers.json. Decoys are read_file and write_file. Tests picking the right operation and args shape from the tool description.",
   "id": "fc-single-008",
   "category": "single",
   "prompt": "The file /data/customers.json holds a list of customer records. Drop the 'ssn' field from every record and write the result back to /data/customers.redacted.json.",

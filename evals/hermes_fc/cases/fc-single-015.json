@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-015 (system): run_shell_command with a bare 'hostname'. Decoys are read_env and list_processes. command_equivalents accepts hostname / hostname -s / cat /etc/hostname / uname -n. Tests that several equivalent shell spellings are accepted.",
   "id": "fc-single-015",
   "category": "single",
   "prompt": "Run the `hostname` command and tell me what the system reports.",

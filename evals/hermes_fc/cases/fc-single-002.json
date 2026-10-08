@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-002 (web): http_get with an explicitly named URL (https://example.com/api/readme). Decoys are http_post and web_search. Tests picking GET over POST and over search, and extracting the url arg from prose.",
   "id": "fc-single-002",
   "category": "single",
   "prompt": "Fetch the README at https://example.com/api/readme and summarize the first paragraph.",

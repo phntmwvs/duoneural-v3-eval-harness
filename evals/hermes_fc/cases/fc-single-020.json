@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-020 (system): list_processes with filter_user 'mysql'. Decoys are run_shell_command and read_env. Tests picking the structured process-lister over a `ps` shell command and mapping 'owned by the mysql user' to the filter_user arg.",
   "id": "fc-single-020",
   "category": "single",
   "prompt": "List the running processes owned by the 'mysql' user. Return a snapshot of what they're doing.",

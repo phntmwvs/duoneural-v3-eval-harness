@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-004 (time): schedule_meeting with a fully specified call — title, attendee list, date, time, timezone and duration. Decoys are get_current_time, cancel_meeting and list_calendar. Tests assembling a multi-field args object from prose and picking the create verb.",
   "id": "fc-single-004",
   "category": "single",
   "prompt": "Schedule a 30-minute meeting titled 'Q3 planning' with alice@example.com on 2026-11-04 at 14:00 in the Europe/London timezone.",

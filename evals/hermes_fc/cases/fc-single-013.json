@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-013 (data): filter_records with the predicate $[?(@.in_stock==true)] on /data/products.json. Decoys are parse_json, extract_field and transform_json. Tests translating a 'where field is true' condition into a filter expression.",
   "id": "fc-single-013",
   "category": "single",
   "prompt": "From /data/products.json, return the count of products where the 'in_stock' field is true. Report the number back to me.",

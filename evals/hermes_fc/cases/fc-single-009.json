@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-009 (time): cancel_meeting with an explicitly given meeting_id (mtg-2026-11-04-standup). Decoys are list_calendar and schedule_meeting. Tests picking the cancel verb and extracting the id.",
   "id": "fc-single-009",
   "category": "single",
   "prompt": "Cancel the team standup — its meeting id is mtg-2026-11-04-standup.",

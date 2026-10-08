@@ -1,5 +1,5 @@
 {
-  "_doc": "fc-system2-005 (system, run_shell_command with command reasoning): the user wants the 3 largest files in /var/log/ by size, in human-readable form. The model has to construct the right command — many variants work (ls -lhS | head -3, du -h | sort -hr | head -3, find ... | head -3, etc.). command_equivalents whitelists the most common 4 variants. The reasoning required: shell-construction skill. Single tool exposed.",
+  "_doc": "fc-system2-005 (system, run_shell_command with command reasoning): the user wants the 3 largest files in /var/log/ by size, in human-readable form. The model has to construct the right command — many variants work (ls -lhS | head -3, du -h | sort -hr | head -3, find ... | head -3, etc.). command_equivalents whitelists the common variants — including header-skipping forms, since a bare `ls -l`-based pipeline emits a 'total NNN' header line that `head -3` counts against the 3-file budget (review of PR #34, N1). The naive `| head -3` spelling is kept in the list too: the case tests command-construction reasoning, not shell perfection. The reasoning required: shell-construction skill. Single tool exposed.",
   "id": "fc-system2-005",
   "category": "system2",
   "prompt": "Find the 3 largest files in /var/log/ by size. Use a single run_shell_command call that lists them in descending size order with their sizes in human-readable form.",
@@ -27,8 +27,14 @@
     "calls": [
       {
         "name": "run_shell_command",
-        "arguments": { "command": "ls -lhS /var/log/ | head -3" },
+        "arguments": { "command": "ls -lhS /var/log/ | tail -n +2 | head -3" },
         "command_equivalents": [
+          "ls -lhS /var/log/ | tail -n +2 | head -3",
+          "ls -lhS /var/log/ | tail -n +2 | head -n 3",
+          "ls -lhS /var/log/ | sed '1d' | head -3",
+          "ls -lhS /var/log/ | awk 'NR>1' | head -3",
+          "ls -lhS /var/log/ | head -4",
+          "ls -lS /var/log/ | tail -n +2 | head -3",
           "ls -lhS /var/log/ | head -3",
           "ls -lS /var/log/ | head -3",
           "du -h /var/log/* | sort -hr | head -3",

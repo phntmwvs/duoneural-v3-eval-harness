@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-006 (filesystem): copy_file with src/dst. Decoys are read_file, write_file and move_file. The prompt says the destination directory may not exist and to create it as part of the copy — tests picking copy over the plausible-wrong move verb and extracting both paths.",
   "id": "fc-single-006",
   "category": "single",
   "prompt": "Make a backup of /etc/nginx/nginx.conf at /var/backups/nginx.conf.before-edit. The destination directory may not exist; create it as part of the copy if needed.",

@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-014 (time): list_calendar over the explicit UTC day range 2026-11-04T00:00:00Z -> 2026-11-05T00:00:00Z. Decoys are schedule_meeting, get_current_time and cancel_meeting. Tests turning 'the 2026-11-04 (UTC day)' into a half-open from/to range.",
   "id": "fc-single-014",
   "category": "single",
   "prompt": "List every meeting on my calendar for 2026-11-04 (UTC day). I want to see what's already booked that day.",

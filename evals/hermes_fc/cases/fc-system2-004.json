@@ -2,7 +2,7 @@
   "_doc": "fc-system2-004 (data, transform_json with operation reasoning): the user wants the 'price' field renamed to 'unit_price' in /data/products.json. The model has to know that the right operation is 'rename_field' (not drop_field or project) and the right args shape is {from: 'price', to: 'unit_price'}. The reasoning required: reading the transform_json tool description and picking the right operation + arg shape. Single tool exposed.",
   "id": "fc-system2-004",
   "category": "system2",
-  "prompt": "/data/products.json contains a list of products, each with fields id, name, price, category. Rename the 'price' field to 'unit_price' in place. Use transform_json with the rename_field operation.",
+  "prompt": "/data/products.json contains a list of products, each with fields id, name, price, category. Rename the 'price' field to 'unit_price' in the returned JSON. Use transform_json with the rename_field operation.",
   "system": "Before answering, write your reasoning inside a <thought>...</thought> block. Then call the tool using the <tool_call> format.",
   "tools": [
     {

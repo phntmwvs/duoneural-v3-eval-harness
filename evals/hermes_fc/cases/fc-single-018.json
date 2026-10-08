@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-single-018 (data): aggregate with operation 'sum' and field 'amount' on /data/orders.json. Decoys are parse_json, extract_field, transform_json and filter_records. Tests picking the aggregate tool and the sum/field args shape for 'total revenue'.",
   "id": "fc-single-018",
   "category": "single",
   "prompt": "From /data/orders.json, what's the total revenue (sum of the 'amount' field) across all orders? Report the number back to me.",
