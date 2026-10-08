@@ -1,0 +1,73 @@
+{
+  "_doc": "fc-negative-004: 'tools present but irrelevant' (arithmetic). The user asks a math question; the available tools are all filesystem and can't compute. The model should answer '391' in prose, not call any tool. Tests the 'no tool fits' pattern again with a different domain mismatch.",
+  "id": "fc-negative-004",
+  "category": "negative",
+  "prompt": "What's 17 * 23? Just give me the number.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "read_file",
+        "description": "Read the full text contents of a file at the given absolute path. Returns the file contents as a UTF-8 string, or an error if the file does not exist or is not readable.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "write_file",
+        "description": "Write a UTF-8 string to a file at the given absolute path, overwriting any existing contents.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "contents": { "type": "string" }
+          },
+          "required": ["path", "contents"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "delete_file",
+        "description": "Delete a file at the given absolute path. Irreversible. Returns an error if the file does not exist, if the path is a directory, or if the caller lacks write permission.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "copy_file",
+        "description": "Copy a file from `src` to `dst`. Creates `dst`'s parent directories if they don't already exist. Overwrites `dst` if it exists.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "src": { "type": "string" },
+            "dst": { "type": "string" }
+          },
+          "required": ["src", "dst"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": []
+  }
+}
