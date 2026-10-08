@@ -1,0 +1,30 @@
+{
+  "_doc": "fc-system2-003 (web, web_search with query reasoning): the user asks for the latest stable Rust release. The model has to construct a query that returns recent results — phrasing matters (e.g. 'latest stable Rust release' vs 'Rust 1.x release notes' vs 'Rust current version'). The reasoning required: query-phrasing skill. Single web_search tool exposed so the 4-bit model fits thought + call in 512 tokens.",
+  "id": "fc-system2-003",
+  "category": "system2",
+  "prompt": "Search the web for the most recent stable release of the Rust programming language. I want the version number and the release date.",
+  "system": "Before answering, write your reasoning inside a <thought>...</thought> block. Then call the tool using the <tool_call> format.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "web_search",
+        "description": "Run a web search query and return the top 5 results as a JSON array of {title, url, snippet}.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": { "type": "string" }
+          },
+          "required": ["query"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "web_search", "arguments": { "query": "latest stable release of Rust" } }
+    ]
+  },
+  "require_thought": true
+}

@@ -123,6 +123,35 @@ class TestCaseSchema(unittest.TestCase):
                     f"{fname}: system2 must have require_thought: true",
                 )
 
+    def test_system2_has_system_field(self):
+        # Per the #4 amendment (2026-10-07): system2 cases carry a
+        # 'think first' system message. The v3 4-bit model does not
+        # emit `` reliably under the stock template; the system
+        # field is what makes the gate clear. A system2 case without
+        # a system field will score 0/10 thought 100% of the time.
+        for fname, c in self.cases:
+            if c["category"] == "system2":
+                self.assertIsNotNone(
+                    c.get("system"),
+                    f"{fname}: system2 must have a 'system' field "
+                    f"(the 'think first' nudge per the #4 amendment)",
+                )
+
+    def test_system2_has_at_most_one_tool(self):
+        # The v3 4-bit model runs out of output tokens (512 cap) when
+        # exposed to 4 detailed tool schemas — observed in the
+        # ``<thought>``-emission probe (see evals/hermes_fc/PROBE_RESULTS.md).
+        # Limiting system2 cases to 1 tool keeps the thought + call
+        # inside the token budget. The probe did not test 2-tool
+        # cases, so we conservatively cap at 1 until we have data.
+        for fname, c in self.cases:
+            if c["category"] == "system2":
+                self.assertLessEqual(
+                    len(c["tools"]), 1,
+                    f"{fname}: system2 cases must expose at most 1 tool "
+                    f"(found {len(c['tools'])})",
+                )
+
     def test_depends_on_order_only_on_parallel(self):
         # Per #4: ``depends_on_order`` is a parallel-category-only knob.
         # The ``True`` value flips the scoring rule to "calls must appear
