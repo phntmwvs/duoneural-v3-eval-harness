@@ -11,6 +11,7 @@ checkpoints/
 evals/results/
 evals/bfcl_runs/
 evals/evalplus_runs/
+evals/hermes_runs/
 
 # OS
 .DS_Store
