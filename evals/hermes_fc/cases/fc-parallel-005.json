@@ -1,4 +1,5 @@
 {
+  "_doc": "fc-parallel-005 (system): 2x read_env (PATH, HOME) + 1x list_processes (filter_user='www-data'). No order. Design note: the expected is 3 separate calls (not a single read_env() with no name), which deliberately tests the model's call-granularity judgment. A model that batches to one read_env() (no name) would correctly fetch all env vars but would not match the expected set under case-level AND (missing 2 of 3 expected). This is the right test: parallel cases should test right-granularity, not minimum-tool-use (which the single category covers).",
   "id": "fc-parallel-005",
   "category": "parallel",
   "prompt": "Give me a quick environment snapshot: the value of PATH, the value of HOME, and a list of running processes owned by the 'www-data' user.",
@@ -7,11 +8,13 @@
       "type": "function",
       "function": {
         "name": "read_env",
-        "description": "Read the value of a single environment variable. If `name` is omitted, returns a JSON object of {name: value} for every env var. Sensitive variables are redacted to '<redacted>'.",
+        "description": "Read the value of a single environment variable. If `name` is omitted, returns a JSON object of {name: value} for every env var. Sensitive variables (anything containing 'SECRET', 'TOKEN', 'KEY', or 'PASSWORD' in the name) are redacted to '<redacted>' for safety.",
         "parameters": {
           "type": "object",
           "properties": {
-            "name": { "type": "string" }
+            "name": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
         }
@@ -25,7 +28,9 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "filter_user": { "type": "string" }
+            "filter_user": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
         }
@@ -34,9 +39,24 @@
   ],
   "expected": {
     "calls": [
-      { "name": "read_env", "arguments": { "name": "PATH" } },
-      { "name": "read_env", "arguments": { "name": "HOME" } },
-      { "name": "list_processes", "arguments": { "filter_user": "www-data" } }
+      {
+        "name": "read_env",
+        "arguments": {
+          "name": "PATH"
+        }
+      },
+      {
+        "name": "read_env",
+        "arguments": {
+          "name": "HOME"
+        }
+      },
+      {
+        "name": "list_processes",
+        "arguments": {
+          "filter_user": "www-data"
+        }
+      }
     ]
   }
 }

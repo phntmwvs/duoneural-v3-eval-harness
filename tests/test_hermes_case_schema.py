@@ -130,8 +130,22 @@ class TestCaseSchema(unittest.TestCase):
         # because those categories already have at most one call (single,
         # system2) or zero (negative). A stray ``true`` on another
         # category is almost certainly an authoring bug.
+        #
+        # Two assertions:
+        #   (a) if the value is truthy, it must be the literal ``True``
+        #       (a string like ``"yes"`` or an int like ``1`` is a wrong-
+        #       typed value, not a valid flag);
+        #   (b) if the value is ``True``, the case must be ``parallel``.
         for fname, c in self.cases:
-            if c.get("depends_on_order") is True and c["category"] != "parallel":
+            val = c.get("depends_on_order")
+            if val is None or val is False:
+                continue
+            if val is not True:
+                self.fail(
+                    f"{fname}: depends_on_order must be the literal true "
+                    f"or absent, got {val!r} (type {type(val).__name__})"
+                )
+            if c["category"] != "parallel":
                 self.fail(
                     f"{fname}: depends_on_order: true is only valid on "
                     f"parallel cases (this case is {c['category']!r})"
