@@ -1,0 +1,42 @@
+{
+  "id": "fc-parallel-005",
+  "category": "parallel",
+  "prompt": "Give me a quick environment snapshot: the value of PATH, the value of HOME, and a list of running processes owned by the 'www-data' user.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "read_env",
+        "description": "Read the value of a single environment variable. If `name` is omitted, returns a JSON object of {name: value} for every env var. Sensitive variables are redacted to '<redacted>'.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_processes",
+        "description": "Return a snapshot of running processes as a JSON array of {pid, user, command}.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "filter_user": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "read_env", "arguments": { "name": "PATH" } },
+      { "name": "read_env", "arguments": { "name": "HOME" } },
+      { "name": "list_processes", "arguments": { "filter_user": "www-data" } }
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "id": "fc-parallel-003",
+  "category": "parallel",
+  "prompt": "Three customer-data files need scrubbing before they go to staging. For each, drop the 'ssn' field and drop the 'credit_card' field. Files: /data/customers.json, /data/orders.json, /data/addresses.json. Write the scrubbed result back to a sibling file with '.redacted' before the extension.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "transform_json",
+        "description": "Apply a small set of named transforms to a JSON value loaded from disk. `operation` is one of: 'rename_field' (rename a top-level field), 'drop_field' (remove a top-level field), 'project' (keep only a whitelisted set of top-level fields).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "operation": {
+              "type": "string",
+              "enum": ["rename_field", "drop_field", "project"]
+            },
+            "args": { "type": "object", "additionalProperties": true }
+          },
+          "required": ["path", "operation", "args"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "transform_json", "arguments": { "path": "/data/customers.json", "operation": "drop_field", "args": { "field": "ssn" } } },
+      { "name": "transform_json", "arguments": { "path": "/data/customers.json", "operation": "drop_field", "args": { "field": "credit_card" } } },
+      { "name": "transform_json", "arguments": { "path": "/data/orders.json", "operation": "drop_field", "args": { "field": "ssn" } } },
+      { "name": "transform_json", "arguments": { "path": "/data/orders.json", "operation": "drop_field", "args": { "field": "credit_card" } } },
+      { "name": "transform_json", "arguments": { "path": "/data/addresses.json", "operation": "drop_field", "args": { "field": "ssn" } } },
+      { "name": "transform_json", "arguments": { "path": "/data/addresses.json", "operation": "drop_field", "args": { "field": "credit_card" } } }
+    ]
+  }
+}

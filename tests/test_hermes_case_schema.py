@@ -123,6 +123,20 @@ class TestCaseSchema(unittest.TestCase):
                     f"{fname}: system2 must have require_thought: true",
                 )
 
+    def test_depends_on_order_only_on_parallel(self):
+        # Per #4: ``depends_on_order`` is a parallel-category-only knob.
+        # The ``True`` value flips the scoring rule to "calls must appear
+        # in expected order"; it's meaningless on single/negative/system2
+        # because those categories already have at most one call (single,
+        # system2) or zero (negative). A stray ``true`` on another
+        # category is almost certainly an authoring bug.
+        for fname, c in self.cases:
+            if c.get("depends_on_order") is True and c["category"] != "parallel":
+                self.fail(
+                    f"{fname}: depends_on_order: true is only valid on "
+                    f"parallel cases (this case is {c['category']!r})"
+                )
+
     def test_command_equivalents_only_on_string_args(self):
         # Q5/c1 extension from the review of PR #25: command_equivalents is
         # an optional list of strings per expected call, and only applies
