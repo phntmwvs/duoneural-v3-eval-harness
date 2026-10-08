@@ -1,0 +1,96 @@
+{
+  "_doc": "fc-parallel-009 (time): list_calendar + schedule_meeting; no order. The prompt says 'check if 14:00 UTC is free, and if it is, schedule...' but the test passes either order: list-then-schedule (check first) or schedule-then-list (assume free, verify after). No order dependency; tests that the model picks the right 2 time tools out of 4 (cancel_meeting, get_current_time, list_calendar, schedule_meeting).",
+  "id": "fc-parallel-009",
+  "category": "parallel",
+  "prompt": "Check the calendar for 2026-12-01 to see if 14:00 UTC is free. If it is, schedule a 60-minute 'Team retro' with alice@example.com, bob@example.com, carol@example.com, and dave@example.com at that slot.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "schedule_meeting",
+        "description": "Schedule a calendar meeting. `attendees` is a list of email addresses, `date` is YYYY-MM-DD, `time` is HH:MM in 24h, `timezone` is an IANA tz like 'UTC', `duration_minutes` is an integer.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "attendees": { "type": "array", "items": { "type": "string" } },
+            "date": { "type": "string" },
+            "time": { "type": "string" },
+            "timezone": { "type": "string" },
+            "duration_minutes": { "type": "integer" }
+          },
+          "required": ["title", "attendees", "date", "time", "timezone", "duration_minutes"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_current_time",
+        "description": "Return the current local time in the given IANA timezone.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "timezone": { "type": "string" }
+          },
+          "required": ["timezone"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancel_meeting",
+        "description": "Cancel a previously scheduled meeting by its id.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "meeting_id": { "type": "string" }
+          },
+          "required": ["meeting_id"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_calendar",
+        "description": "List meetings scheduled between two ISO datetimes.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "from": { "type": "string" },
+            "to": { "type": "string" }
+          },
+          "required": ["from", "to"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      {
+        "name": "list_calendar",
+        "arguments": {
+          "from": "2026-12-01T00:00:00Z",
+          "to": "2026-12-02T00:00:00Z"
+        }
+      },
+      {
+        "name": "schedule_meeting",
+        "arguments": {
+          "title": "Team retro",
+          "attendees": ["alice@example.com", "bob@example.com", "carol@example.com", "dave@example.com"],
+          "date": "2026-12-01",
+          "time": "14:00",
+          "timezone": "UTC",
+          "duration_minutes": 60
+        }
+      }
+    ]
+  }
+}

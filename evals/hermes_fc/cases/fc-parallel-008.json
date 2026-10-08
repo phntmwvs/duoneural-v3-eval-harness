@@ -1,0 +1,70 @@
+{
+  "_doc": "fc-parallel-008 (data): transform_json + aggregate; no order. Two mixed-tool calls on the same file. The transform drops a sensitive field, the aggregate computes a sum. Both calls operate on the same data but produce different outputs; the model has to know which tool does which. Tests right-tool selection across the data domain, not order reasoning.",
+  "id": "fc-parallel-008",
+  "category": "parallel",
+  "prompt": "From /data/sales.json, drop the 'customer_email' field, then compute the total revenue (sum of the 'amount' field). Report both results.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "transform_json",
+        "description": "Apply a small set of named transforms to a JSON value loaded from disk. Returns the transformed value as a JSON string. `operation` is one of: 'rename_field' (rename a top-level field — args: {\"from\": \"old_name\", \"to\": \"new_name\"}), 'drop_field' (remove a top-level field — args: {\"field\": \"field_name\"}), 'project' (keep only a whitelisted set of top-level fields — args: {\"fields\": [\"field_a\", \"field_b\"]}).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "operation": {
+              "type": "string",
+              "enum": ["rename_field", "drop_field", "project"]
+            },
+            "args": { "type": "object", "additionalProperties": true }
+          },
+          "required": ["path", "operation", "args"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "aggregate",
+        "description": "Compute an aggregate over a list of records loaded from a JSON file. `operation` is one of 'count', 'sum', 'avg', 'min', 'max'. `field` is the field to aggregate over (omit `field` for `count`, which counts records regardless of fields). Returns a number.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "operation": {
+              "type": "string",
+              "enum": ["count", "sum", "avg", "min", "max"]
+            },
+            "field": { "type": "string" }
+          },
+          "required": ["path", "operation"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "filter_records",
+        "description": "Load a JSON file containing a list of records (or an object with a 'records' field), apply a JSONPath predicate filter, and return the matching records as a JSON array. Returns an empty array if nothing matches.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "Absolute path to a JSON file on disk containing a list (or {records: [...]})" },
+            "filter": { "type": "string", "description": "JSONPath predicate, e.g. \"$[?(@.in_stock==true)]\"" }
+          },
+          "required": ["path", "filter"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "transform_json", "arguments": { "path": "/data/sales.json", "operation": "drop_field", "args": { "field": "customer_email" } } },
+      { "name": "aggregate", "arguments": { "path": "/data/sales.json", "operation": "sum", "field": "amount" } }
+    ]
+  }
+}

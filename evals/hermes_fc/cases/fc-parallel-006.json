@@ -1,0 +1,61 @@
+{
+  "_doc": "fc-parallel-006 (filesystem): list + 2x delete; depends_on_order: true. The prompt names the specific files to delete but instructs the model to list first; the expected calls are list_directory then 2x delete_file in that exact order. Order matters because the prompt's 'first... then' phrasing makes the list step a verification, not a discoverable step (the files are named). Tests that the model can do 3 calls in the right order, not just 1 or 2.",
+  "id": "fc-parallel-006",
+  "category": "parallel",
+  "prompt": "First list the contents of /tmp/old-builds/ to see what's there. Then delete /tmp/old-builds/app-1.0.tar.gz and /tmp/old-builds/app-1.1.tar.gz.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "read_file",
+        "description": "Read the full text contents of a file at the given absolute path. Returns the file contents as a UTF-8 string, or an error if the file does not exist or is not readable.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_directory",
+        "description": "List the names of entries (files and subdirectories) directly inside the given absolute directory path. Non-recursive.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "delete_file",
+        "description": "Delete a file at the given absolute path. Irreversible. Returns an error if the file does not exist, if the path is a directory, or if the caller lacks write permission.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "Absolute path of the file to delete" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "list_directory", "arguments": { "path": "/tmp/old-builds/" } },
+      { "name": "delete_file", "arguments": { "path": "/tmp/old-builds/app-1.0.tar.gz" } },
+      { "name": "delete_file", "arguments": { "path": "/tmp/old-builds/app-1.1.tar.gz" } }
+    ]
+  },
+  "depends_on_order": true
+}

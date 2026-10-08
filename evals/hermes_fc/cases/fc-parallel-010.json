@@ -1,0 +1,60 @@
+{
+  "_doc": "fc-parallel-010 (system): 3 mixed calls (read_env, run_shell_command, list_processes); no order. The prompt names a distinct tool for each piece of information: env-var lookup for PATH, shell for uname, process-list for ps. Decoys are minimal (each tool is the right one for its piece). Tests the model's ability to do 3 unrelated info-gathering calls in one turn with correct arg shapes per tool.",
+  "id": "fc-parallel-010",
+  "category": "parallel",
+  "prompt": "Give me a quick system snapshot: the value of PATH, the kernel release (use `uname -r`), and a list of running processes. Use the appropriate tool for each piece.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "run_shell_command",
+        "description": "Execute a shell command in a sandboxed non-interactive shell and return its combined stdout+stderr. Read-only commands are recommended; commands that modify the filesystem require explicit confirmation via `confirm: true`.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "command": { "type": "string" },
+            "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 60 },
+            "confirm": { "type": "boolean", "description": "Must be true for any command that writes outside /tmp or invokes package managers." }
+          },
+          "required": ["command"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "read_env",
+        "description": "Read the value of a single environment variable. If `name` is omitted, returns a JSON object of {name: value} for every env var. Sensitive variables (anything containing 'SECRET', 'TOKEN', 'KEY', or 'PASSWORD' in the name) are redacted to '<redacted>' for safety.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_processes",
+        "description": "Return a snapshot of running processes as a JSON array of {pid, user, command}.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "filter_user": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "read_env", "arguments": { "name": "PATH" } },
+      { "name": "run_shell_command", "arguments": { "command": "uname -r" } },
+      { "name": "list_processes", "arguments": {} }
+    ]
+  }
+}
