@@ -1,0 +1,106 @@
+{
+  "id": "fc-single-018",
+  "category": "single",
+  "prompt": "From /data/orders.json, what's the total revenue (sum of the 'amount' field) across all orders? Report the number back to me.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "parse_json",
+        "description": "Parse a JSON string and return the resulting value (object, array, or scalar). Throws on invalid JSON.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" }
+          },
+          "required": ["text"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "extract_field",
+        "description": "Read a JSON value at the given absolute file path and return the value at the given JSONPath expression, e.g. \"$['users'][?(@.id==42)].email\". Returns null if no node matches.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "field": { "type": "string", "description": "JSONPath expression (RFC 9535 syntax)" }
+          },
+          "required": ["path", "field"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "transform_json",
+        "description": "Apply a small set of named transforms to a JSON value loaded from disk. Returns the transformed value as a JSON string. `operation` is one of: 'rename_field' (rename a top-level field), 'drop_field' (remove a top-level field), 'project' (keep only a whitelisted set of top-level fields).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "operation": {
+              "type": "string",
+              "enum": ["rename_field", "drop_field", "project"]
+            },
+            "args": { "type": "object", "additionalProperties": true }
+          },
+          "required": ["path", "operation", "args"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "filter_records",
+        "description": "Load a JSON file containing a list of records (or an object with a 'records' field), apply a JSONPath predicate filter, and return the matching records as a JSON array. Returns an empty array if nothing matches.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "Absolute path to a JSON file on disk containing a list (or {records: [...]})" },
+            "filter": { "type": "string", "description": "JSONPath predicate, e.g. \"$[?(@.in_stock==true)]\"" }
+          },
+          "required": ["path", "filter"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "aggregate",
+        "description": "Compute an aggregate over a list of records loaded from a JSON file. `operation` is one of 'count', 'sum', 'avg', 'min', 'max'. `field` is the field to aggregate over (omit `field` for `count`, which counts records regardless of fields). Returns a number.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "operation": {
+              "type": "string",
+              "enum": ["count", "sum", "avg", "min", "max"]
+            },
+            "field": { "type": "string" }
+          },
+          "required": ["path", "operation"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      {
+        "name": "aggregate",
+        "arguments": {
+          "path": "/data/orders.json",
+          "operation": "sum",
+          "field": "amount"
+        }
+      }
+    ]
+  }
+}
