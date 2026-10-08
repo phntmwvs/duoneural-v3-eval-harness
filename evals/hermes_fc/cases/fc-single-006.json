@@ -1,0 +1,75 @@
+{
+  "id": "fc-single-006",
+  "category": "single",
+  "prompt": "Make a backup of /etc/nginx/nginx.conf at /var/backups/nginx.conf.before-edit. The destination directory may not exist; create it as part of the copy if needed.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "read_file",
+        "description": "Read the full text contents of a file at the given absolute path.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "write_file",
+        "description": "Write a UTF-8 string to a file at the given absolute path, overwriting any existing contents.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "contents": { "type": "string" }
+          },
+          "required": ["path", "contents"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "copy_file",
+        "description": "Copy a file from `src` to `dst`. Creates `dst`'s parent directories if they don't already exist. Overwrites `dst` if it exists.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "src": { "type": "string", "description": "Absolute path of the source file" },
+            "dst": { "type": "string", "description": "Absolute path of the destination file" }
+          },
+          "required": ["src", "dst"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "move_file",
+        "description": "Rename or move a file or directory. Both paths must be absolute. Fails if `dst` exists.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "src": { "type": "string" },
+            "dst": { "type": "string" }
+          },
+          "required": ["src", "dst"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "copy_file", "arguments": { "src": "/etc/nginx/nginx.conf", "dst": "/var/backups/nginx.conf.before-edit" } }
+    ]
+  }
+}

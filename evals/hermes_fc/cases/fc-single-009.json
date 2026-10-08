@@ -1,0 +1,63 @@
+{
+  "id": "fc-single-009",
+  "category": "single",
+  "prompt": "Cancel the team standup — its meeting id is mtg-2026-11-04-standup.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "cancel_meeting",
+        "description": "Cancel a previously scheduled meeting by its id.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "meeting_id": { "type": "string" }
+          },
+          "required": ["meeting_id"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_calendar",
+        "description": "List meetings scheduled between two ISO datetimes.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "from": { "type": "string" },
+            "to": { "type": "string" }
+          },
+          "required": ["from", "to"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "schedule_meeting",
+        "description": "Schedule a calendar meeting. `attendees` is a list of email addresses, `date` is YYYY-MM-DD, `time` is HH:MM in 24h, `timezone` is an IANA tz like 'Europe/London', `duration_minutes` is an integer.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "attendees": { "type": "array", "items": { "type": "string" } },
+            "date": { "type": "string" },
+            "time": { "type": "string" },
+            "timezone": { "type": "string" },
+            "duration_minutes": { "type": "integer" }
+          },
+          "required": ["title", "attendees", "date", "time", "timezone", "duration_minutes"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "cancel_meeting", "arguments": { "meeting_id": "mtg-2026-11-04-standup" } }
+    ]
+  }
+}
