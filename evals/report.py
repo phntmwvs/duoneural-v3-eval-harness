@@ -106,21 +106,22 @@ class CrossCheckSection:
 
 
 def _strip_yaml_comments(text: str) -> str:
-    """Strip ``#`` comments from YAML, preserving trailing '#' inside strings.
+    """Strip ``#`` comments from YAML by truncating at the first ``#``.
 
     The anchors file is well-known, hand-authored, and only contains
-    top-level keys + scalar floats — we don't need a real YAML parser.
-    A line that starts with ``#`` is a comment; an inline ``#`` is one
-    too. Anything inside a single/double-quoted string is preserved.
+    top-level keys + scalar floats with no quoted strings or embedded
+    ``#`` in values — we don't need a real YAML parser. A line that
+    starts with ``#`` is dropped; on a content line everything from the
+    first ``#`` onward is treated as an inline comment and stripped.
+    This is intentionally not quote-aware.
     """
     cleaned = []
     for raw in text.splitlines():
         if not raw.strip() or raw.lstrip().startswith("#"):
             cleaned.append("")
             continue
-        # Strip an inline "# …" but only if the # isn't inside a quoted
-        # string on this line. The anchors file doesn't use quoted
-        # strings, so the simple rule works.
+        # Truncate at the first "#" (no quote-awareness; the anchors file
+        # contains no quoted strings or '#' embedded in values).
         idx = raw.find("#")
         if idx >= 0:
             raw = raw[:idx].rstrip()
@@ -338,17 +339,24 @@ _CROSSCHECK_METRICS = {
 }
 
 
-def _vendor_section_for(matrix_row: str, component: str) -> tuple:
-    """Return ``(vendor_model, anchor_section_key, display_section)``."""
-    vendor_model = ROW_VENDOR_ANCHORS.get(matrix_row, "duoneural_v3")
+def _anchor_source_for(matrix_row: str, component: str,
+                       vendor_model: Optional[str] = None) -> tuple:
+    """Return ``(vendor_model, anchor_section_key)`` for ``component``.
+
+    BFCLv3 is published by the LiquidAI base card, not the DuoNeural card,
+    so it always resolves to ``liquidai_base`` regardless of ``matrix_row``
+    (the DuoNeural card has no BFCL anchor). EvalPlus and Hermes FC figures
+    come from the DuoNeural v3 card; they resolve to ``matrix_row``'s vendor
+    model — ``liquidai_base`` only for the ``base`` row, which has no
+    published evalplus/hermes anchor, so those cells render ``no_vendor``.
+
+    ``vendor_model`` overrides the default for non-BFCL components (tests).
+    """
     if component == "bfcl":
-        return vendor_model, "bfcl", "BFCL ({0} vendor)".format(
-            "LiquidAI base" if vendor_model == "liquidai_base" else "duoneural_v3"
-        )
-    return vendor_model, component, "{0} ({1} vendor)".format(
-        {"evalplus": "EvalPlus", "hermes": "Hermes FC"}.get(component, component),
-        "duoneural_v3",
-    )
+        return "liquidai_base", "bfcl"
+    if vendor_model is not None:
+        return vendor_model, component
+    return ROW_VENDOR_ANCHORS.get(matrix_row, "duoneural_v3"), component
 
 
 def build_crosscheck_table(
@@ -363,7 +371,7 @@ def build_crosscheck_table(
     ``local_scores`` shape (per component, in percent units)::
 
         {
-          "bfcl":     {"base_local": 62.10},     # single metric for BFCL
+          "bfcl":     {"bfclv3_pct": 62.10},     # single metric for BFCL
           "evalplus": {"humaneval_base_pct": 56.10, "humaneval_plus_pct": 50.00,
                        "mbpp_base_pct": 60.80,     "mbpp_plus_pct": 49.70},
           "hermes":   {"fc_ast_pct": 75.00},
@@ -393,8 +401,8 @@ def build_crosscheck_table(
         )
 
     sections = []
-    for component, (metric_keys, _display_base) in _CROSSCHECK_METRICS.items():
-        vm, anchor_key, display = _vendor_section_for(matrix_row, component)
+    for component, (metric_keys, display) in _CROSSCHECK_METRICS.items():
+        vm, anchor_key = _anchor_source_for(matrix_row, component, vendor_model=vendor_model)
         vendor_metrics = anchors[vm].get(anchor_key, {})
         local_metrics = local_scores.get(component, {}) or {}
         cells = []
@@ -411,49 +419,6 @@ def build_crosscheck_table(
             ))
         sections.append(CrossCheckSection(section=display, cells=tuple(cells)))
     return tuple(sections)
-
-
-# ---------------------------------------------------------------------------
-# Local-score extraction from per-cell result JSONs (subscores footer)
-# ---------------------------------------------------------------------------
-
-
-def _extract_local_scores_from_results(results_dir: str, summary: dict) -> dict:
-    """Lift the percent scores the cross-check needs from the per-cell JSONs.
-
-    BFCL emits a single score; EvalPlus emits four (HumanEval base/±, MBPP base/±);
-    Hermes FC emits one (fc_ast_pct). We read these from each cell's result file
-    rather than the summary so the report never duplicates logic the adapters
-    own.
-    """
-    out: dict = {"bfcl": {}, "evalplus": {}, "hermes": {}}
-    for cell in summary.get("cells", []):
-        if cell.get("status") != "ok":
-            continue
-        path = cell.get("path")
-        if not path or not os.path.exists(path):
-            continue
-        with open(path, encoding="utf-8") as fh:
-            result = json.load(fh)
-        comp = result.get("component")
-        sub = result.get("subscores") or {}
-        if comp == "bfcl":
-            out["bfcl"]["base_local"] = result.get("score") * 100.0
-        elif comp == "evalplus":
-            # EvalPlus stores pass@1 in subscores as floats in [0, 1].
-            for key in ("humaneval_base_pct", "humaneval_plus_pct",
-                        "mbpp_base_pct", "mbpp_plus_pct"):
-                # The adapter writes them as raw floats (0.561). Multiply to %.
-                # Older versions may have written them as percentages already.
-                v = sub.get(key)
-                if v is None:
-                    continue
-                if v <= 1.0:
-                    v = v * 100.0
-                out["evalplus"][key] = float(v)
-        elif comp == "hermes":
-            out["hermes"]["fc_ast_pct"] = result.get("score") * 100.0
-    return out
 
 
 # ---------------------------------------------------------------------------
@@ -542,10 +507,14 @@ def _load_cell_results(results_dir: str, summary: dict) -> dict:
 
 
 def _fmt_pp(p: Optional[float]) -> str:
-    """Format a delta in pp with explicit sign and 1 decimal."""
+    """Format a delta in pp with explicit sign and 1 decimal.
+
+    Zero renders without a sign (``0.0``) so a no-change delta doesn't
+    read as a positive result.
+    """
     if p is None:
         return "—"
-    sign = "+" if p >= 0 else ""
+    sign = "+" if p > 0 else ""
     return "{0}{1:.1f}".format(sign, p)
 
 
@@ -672,7 +641,9 @@ def render_report(
         # primary score scaled to pp.
         cell = cell_results.get(("bfcl", matrix_row))
         if cell:
-            out_scores["bfcl"]["bfclv3_pct"] = float(cell.get("score") or 0.0) * 100.0
+            score = cell.get("score")
+            if score is not None:
+                out_scores["bfcl"]["bfclv3_pct"] = float(score) * 100.0
         # EvalPlus — four subscores per row from the per-pass fields.
         cell = cell_results.get(("evalplus", matrix_row))
         if cell:
@@ -688,7 +659,9 @@ def render_report(
         # Hermes FC — single primary metric.
         cell = cell_results.get(("hermes", matrix_row))
         if cell:
-            out_scores["hermes"]["fc_ast_pct"] = float(cell.get("score") or 0.0) * 100.0
+            score = cell.get("score")
+            if score is not None:
+                out_scores["hermes"]["fc_ast_pct"] = float(score) * 100.0
         return out_scores
 
     rows_to_check = []

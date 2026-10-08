@@ -246,7 +246,7 @@ class CrossCheckTableTest(unittest.TestCase):
     def _builder_scores(self):
         # Local scores mirror the full summary above.
         return {
-            "bfcl": {"base_local": 62.10},
+            "bfcl": {"bfclv3_pct": 62.10},
             "evalplus": {"humaneval_base_pct": 56.10,
                          "humaneval_plus_pct": 50.00,
                          "mbpp_base_pct": 60.80,
@@ -299,7 +299,7 @@ class CrossCheckTableTest(unittest.TestCase):
             "liquidai_base": {"bfcl": {"bfclv3_pct": 64.79}},
         }
         approx_scores = {
-            "bfcl": {"base_local": 62.10},
+            "bfcl": {"bfclv3_pct": 62.10},
             "evalplus": {"humaneval_base_pct": 56.10,
                          "humaneval_plus_pct": 50.00,
                          "mbpp_base_pct": 60.80,
@@ -415,9 +415,10 @@ class RenderReportTest(unittest.TestCase):
             )
         # Per the new layout, each section is a Variant | Score | Δ table.
         # The BFCL section's deltas vs BF16 baseline (62.10):
-        #   8-bit (61.60) -> -0.5; 4-bit (62.10) -> +0.0; base (49.10) -> -13.0.
+        #   8-bit (61.60) -> -0.5; 4-bit (62.10) -> 0.0; base (49.10) -> -13.0.
         self.assertIn("-0.5", md)
-        self.assertIn("+0.0", md)
+        self.assertNotIn("+0.0", md)
+        self.assertIn("0.0", md)
         self.assertIn("-13.0", md)
 
     def test_render_writes_to_output_arg(self):
