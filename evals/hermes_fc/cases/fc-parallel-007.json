@@ -1,0 +1,48 @@
+{
+  "_doc": "fc-parallel-007 (web): 2x http_get + 1x http_post; depends_on_order: true. The post is a summary of the two gets, so the model has to fetch before posting. Tests mixed-tool parallel calls with a real data dependency. Decoys: web_search (wrong medium). ORDER CONTRACT (M1, PR #31): same as fc-parallel-006 — strict positional is kept because order-insensitive would wrongly pass post-before-get (the post body depends on the gets). The prompt pins the gets' literal order ('First fetch A and B, then POST'); the model is expected to follow it. A future depends_on_order: 'partial' knob in #19 would let the two gets be mutually unordered.",
+  "id": "fc-parallel-007",
+  "category": "parallel",
+  "prompt": "First fetch the order details from https://api.example.com/orders/42 and the customer profile from https://api.example.com/customers/alice, then POST a summary {\"customer\": \"alice\", \"order\": 42} to https://api.example.com/summarize.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "http_get",
+        "description": "Issue an HTTP GET request to the given absolute URL and return the response body as a string. The optional `headers` field is a JSON object of header name to value. Follows up to 5 redirects.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "headers": { "type": "object", "additionalProperties": { "type": "string" } }
+          },
+          "required": ["url"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "http_post",
+        "description": "Issue an HTTP POST request to the given absolute URL with a JSON body. Returns the response body as a string.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "body": { "type": "object", "additionalProperties": true }
+          },
+          "required": ["url", "body"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "expected": {
+    "calls": [
+      { "name": "http_get", "arguments": { "url": "https://api.example.com/orders/42" } },
+      { "name": "http_get", "arguments": { "url": "https://api.example.com/customers/alice" } },
+      { "name": "http_post", "arguments": { "url": "https://api.example.com/summarize", "body": { "customer": "alice", "order": 42 } } }
+    ]
+  },
+  "depends_on_order": true
+}
